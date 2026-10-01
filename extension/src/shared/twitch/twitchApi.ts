@@ -1,22 +1,27 @@
 import { createDevTwitchApi } from '@shared/twitch/devTwitchApi';
 
-/** The subset of Twitch.ext the extension uses — so it can be swapped for a local imitation. */
-export interface TwitchApi {
-  getBroadcasterConfig: () => string | undefined;
-  onConfigChanged: (callback: () => void) => void;
-  setBroadcasterConfig: (content: string) => void;
-  sendBroadcast: (content: string) => void;
-  /** Returns an unsubscribe function. */
-  listenBroadcast: (callback: (content: string) => void) => () => void;
+export interface TwitchAuth {
+  token: string;
+  channelId: string;
 }
 
-const CONFIG_VERSION = '1';
+/** The subset of Twitch.ext the extension uses — so it can be swapped for a local imitation. */
+export interface TwitchApi {
+  workerUrl: string;
+  onAuthorized: (callback: (auth: TwitchAuth) => void) => void;
+  getBroadcasterConfig: () => string | undefined;
+  onConfigChanged: (callback: () => void) => void;
+  /** Returns an unsubscribe function. */
+  listenBroadcast: (callback: (content: string) => void) => () => void;
+  /** Dev only: the local Worker can't reach Twitch, so the config page hands the snapshot to the imitation itself. */
+  mirrorSnapshot?: (content: string) => void;
+}
 
 const realTwitchApi: TwitchApi = {
+  workerUrl: 'https://stream-lists.begidan32.workers.dev',
+  onAuthorized: (callback) => Twitch.ext.onAuthorized(({ token, channelId }) => callback({ token, channelId })),
   getBroadcasterConfig: () => Twitch.ext.configuration.broadcaster?.content,
   onConfigChanged: (callback) => Twitch.ext.configuration.onChanged(callback),
-  setBroadcasterConfig: (content) => Twitch.ext.configuration.set('broadcaster', CONFIG_VERSION, content),
-  sendBroadcast: (content) => Twitch.ext.send('broadcast', 'application/json', content),
   listenBroadcast: (callback) => {
     const handleMessage = (_target: string, _contentType: string, message: string) => callback(message);
     Twitch.ext.listen('broadcast', handleMessage);

@@ -18,7 +18,8 @@
       "@assets/*": ["./src/assets/*"],
       "@domains/*": ["./src/domains/*"],
       "@pages/*": ["./src/pages/*"],
-      "@shared/*": ["./src/shared/*"]
+      "@shared/*": ["./src/shared/*"],
+      "@worker/*": ["../worker/src/*"]
     }
   },
   "include": ["src"]

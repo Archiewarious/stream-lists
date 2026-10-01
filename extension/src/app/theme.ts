@@ -1,9 +1,11 @@
-import { createTheme, type CSSVariablesResolver } from '@mantine/core';
+import { Button, createTheme, type CSSVariablesResolver } from '@mantine/core';
 
 export const theme = createTheme({
   fontFamily: 'Nunito, system-ui, sans-serif',
   headings: { fontFamily: "'Great Vibes', cursive", fontWeight: '400' },
   defaultRadius: 'xl',
+  // Explicit, so styles.css can target [data-variant='filled'] (Mantine omits the attribute for the default).
+  components: { Button: Button.extend({ defaultProps: { variant: 'filled' } }) },
 });
 
 /** Points Mantine's own colors at the theme variables from styles.css, so presets repaint Mantine too. */

@@ -1,3 +1,5 @@
+import { fileURLToPath } from 'node:url';
+
 import basicSsl from '@vitejs/plugin-basic-ssl';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
@@ -11,7 +13,7 @@ export default defineConfig(({ mode }) => {
   return {
     base: './', // Twitch CDN serves the build from a versioned subpath
     plugins: [react(), tailwindcss(), isTwitchMode && basicSsl()],
-    server: { port: isTwitchMode ? 8080 : 5173, strictPort: true },
+    server: { port: isTwitchMode ? 8080 : 5173, strictPort: true, fs: { allow: ['..'] } }, // ../worker/src
     resolve: {
       alias: {
         '@app': '/src/app',
@@ -19,6 +21,7 @@ export default defineConfig(({ mode }) => {
         '@domains': '/src/domains',
         '@pages': '/src/pages',
         '@shared': '/src/shared',
+      '@worker': fileURLToPath(new URL('../worker/src', import.meta.url)), // shared types, snapshot and JWT code
       },
     },
     build: {

@@ -6,7 +6,8 @@
     "dev": "wrangler dev",
     "deploy": "wrangler d1 migrations apply stream-lists --remote && wrangler deploy",
     "test": "vitest run",
-    "typecheck": "wrangler types --include-env=false && tsc --noEmit"
+    "typecheck": "wrangler types --include-env=false && tsc --noEmit",
+    "dev:ext": "wrangler dev --ip 127.0.0.1 --port 8787 --var EXTENSION_SECRET:ZGV2LXNlY3JldA=="
   },
   "devDependencies": {
     "typescript": "5.9",

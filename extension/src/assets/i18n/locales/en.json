@@ -4,30 +4,55 @@
     "movies": "Movies & shows",
     "custom": "Custom"
   },
+  "kindsShort": {
+    "games": "Games",
+    "movies": "Movies",
+    "custom": "Custom"
+  },
   "status": {
     "games": { "now": "Playing now", "queue": "Up next", "done": "Completed" },
     "movies": { "now": "Watching now", "queue": "Up next", "done": "Watched" },
     "custom": { "now": "Now", "queue": "Up next", "done": "Done" }
+  },
+  "columns": {
+    "queue": "Up next",
+    "games": { "watched": "Completed", "markWatched": "Completed", "toWatched": "Straight to completed" },
+    "movies": { "watched": "Watched", "markWatched": "Watched", "toWatched": "Straight to watched" },
+    "custom": { "watched": "Done", "markWatched": "Done", "toWatched": "Straight to done" }
   },
   "panel": {
     "empty": "No lists yet",
     "emptyList": "This list is empty for now"
   },
   "config": {
-    "createFirst": "Create your first list",
+    "yourLists": "Your lists",
     "newList": "New list",
-    "listTitle": "List name",
+    "createFirst": "Create your first list",
+    "listTitle": "Name",
     "create": "Create",
+    "listSettings": "List settings",
+    "save": "Save",
     "deleteList": "Delete list",
-    "deleteListConfirm": "Delete \"{{title}}\" with all its items?",
-    "cancel": "Cancel",
+    "deleteListConfirm": "Delete \"{{title}}\" with all its items? This can't be undone.",
     "delete": "Delete",
-    "addItemPlaceholder": "Add to the queue…",
-    "add": "Add",
-    "emptyList": "The list is empty — add the first item above",
-    "remove": "Remove",
-    "storage": "Storage: {{used}} of {{total}} KB",
-    "overLimit": "This doesn't fit into Twitch storage (5 KB). Remove some items or lists.",
-    "corrupted": "Saved data could not be read. Editing is disabled so it isn't overwritten."
+    "deleteItem": "Delete \"{{title}}\"?",
+    "cancel": "Cancel",
+    "addPlaceholder": "Add to the queue — Enter",
+    "bulk": "Paste a list",
+    "bulkTitle": "Paste a list",
+    "bulkHint": "One title per line. Repeats and titles already in the list are skipped.",
+    "bulkTooMany": "At most {{max}} lines at once",
+    "bulkToQueue": "Queue · {{count}}",
+    "bulkResult": "Added {{added}}, skipped {{skipped}} repeats",
+    "requeue": "Back to queue",
+    "search": "Search",
+    "nothingFound": "Nothing found",
+    "emptyQueue": "The queue is empty — add something above",
+    "emptyWatched": "Items you mark will show up here",
+    "saved": "Saved",
+    "saving": "Saving…",
+    "saveFailed": "Not saved: {{error}}",
+    "loadFailed": "Couldn't load the lists: {{error}}",
+    "retry": "Retry"
   }
 }

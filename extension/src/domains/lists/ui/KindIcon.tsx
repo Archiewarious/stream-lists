@@ -1,6 +1,6 @@
 import { IconDeviceGamepad2, IconListDetails, IconMovie } from '@tabler/icons-react';
 
-import type { ListKind } from '@domains/lists/model/types';
+import type { ListKind } from '@domains/lists/model/useChannel';
 
 const ICONS = {
   games: IconDeviceGamepad2,
