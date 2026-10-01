@@ -1,14 +1,15 @@
-import { Button, Group, Modal, Text, Textarea, TextInput } from '@mantine/core';
+import { Button, Group, Modal, Text, Textarea } from '@mantine/core';
 import { IconCheck, IconList, IconPlus } from '@tabler/icons-react';
 import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { MAX_BULK_ITEMS, parseBulkTitles } from '@domains/lists/lib/items';
-import type { ItemStatus, ListKind } from '@domains/lists/model/useChannel';
+import type { ItemStatus, ListKind, MovieFields } from '@domains/lists/model/useChannel';
+import MovieSearchInput from '@domains/movies/ui/MovieSearchInput';
 
 interface AddItemBarProps {
   kind: ListKind;
-  onAdd: (title: string) => void;
+  onAdd: (title: string, movie?: MovieFields) => void;
   onBulk: (titles: string[], status: ItemStatus) => Promise<void>;
 }
 
@@ -40,14 +41,15 @@ const AddItemBar = ({ kind, onAdd, onBulk }: AddItemBarProps) => {
 
   return (
     <form onSubmit={handleSubmit} className="flex gap-2.5">
-      <TextInput
-        className="flex-1"
-        size="md"
-        leftSection={<IconPlus size={18} />}
-        placeholder={t('config.addPlaceholder')}
-        maxLength={200}
+      <MovieSearchInput
+        withSuggestions={kind === 'movies'}
+        placeholder={t(kind === 'movies' ? 'movies.searchPlaceholder' : 'config.addPlaceholder')}
         value={title}
-        onChange={(event) => setTitle(event.currentTarget.value)}
+        onChange={setTitle}
+        onPick={(pickedTitle, movie) => {
+          onAdd(pickedTitle, movie);
+          setTitle('');
+        }}
       />
       <Button variant="default" size="md" leftSection={<IconList size={18} />} onClick={() => setIsBulkOpened(true)}>
         {t('config.bulk')}

@@ -90,7 +90,7 @@ const ConfigPage = () => {
 
         <AddItemBar
           kind={list.kind}
-          onAdd={(title) => channel.addItem(list.id, title, 'queue')}
+          onAdd={(title, movie) => channel.addItem(list.id, title, 'queue', movie)}
           onBulk={addBulk}
         />
 

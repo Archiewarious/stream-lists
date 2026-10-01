@@ -10,15 +10,39 @@
     "custom": "Своё"
   },
   "status": {
-    "games": { "now": "Играем сейчас", "queue": "В очереди", "done": "Пройдено" },
-    "movies": { "now": "Смотрим сейчас", "queue": "В очереди", "done": "Просмотрено" },
-    "custom": { "now": "Сейчас", "queue": "В очереди", "done": "Готово" }
+    "games": {
+      "now": "Играем сейчас",
+      "queue": "В очереди",
+      "done": "Пройдено"
+    },
+    "movies": {
+      "now": "Смотрим сейчас",
+      "queue": "В очереди",
+      "done": "Просмотрено"
+    },
+    "custom": {
+      "now": "Сейчас",
+      "queue": "В очереди",
+      "done": "Готово"
+    }
   },
   "columns": {
     "queue": "Очередь",
-    "games": { "watched": "Пройдено", "markWatched": "Пройдено", "toWatched": "Сразу в пройденные" },
-    "movies": { "watched": "Просмотрено", "markWatched": "Просмотрено", "toWatched": "Сразу в просмотренные" },
-    "custom": { "watched": "Готово", "markWatched": "Готово", "toWatched": "Сразу в готовое" }
+    "games": {
+      "watched": "Пройдено",
+      "markWatched": "Пройдено",
+      "toWatched": "Сразу в пройденные"
+    },
+    "movies": {
+      "watched": "Просмотрено",
+      "markWatched": "Просмотрено",
+      "toWatched": "Сразу в просмотренные"
+    },
+    "custom": {
+      "watched": "Готово",
+      "markWatched": "Готово",
+      "toWatched": "Сразу в готовое"
+    }
   },
   "panel": {
     "empty": "Стример пока не добавил списки",
@@ -54,5 +78,12 @@
     "saveFailed": "Не сохранилось: {{error}}",
     "loadFailed": "Не удалось загрузить списки: {{error}}",
     "retry": "Повторить"
+  },
+  "movies": {
+    "searchPlaceholder": "Найти фильм — постер и год подтянутся сами",
+    "movie": "фильм",
+    "tv": "сериал",
+    "withoutPoster": "Добавить «{{title}}» без постера",
+    "tmdb": "Постеры и годы — из базы TMDB"
   }
 }

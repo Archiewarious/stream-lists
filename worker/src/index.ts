@@ -1,11 +1,13 @@
 import { signJwt, verifyJwt } from './jwt';
 import { buildSnapshot, SNAPSHOT_VERSION, type ChannelList, type ItemRow, type ListRow } from './snapshot';
+import { POSTER_PATH, toTmdbResults } from './tmdb';
 
 interface Env {
   DB: D1Database;
   EXTENSION_SECRET: string;
   CLIENT_ID: string;
   OWNER_ID: string;
+  TMDB_API_KEY?: string;
 }
 
 const MAX_LISTS = 20;
@@ -65,7 +67,7 @@ const readOptionalInt = (value: unknown, field: string, min: number, max: number
 // TMDB poster path, rendered as an image URL on the panel — so only the TMDB shape is accepted.
 const readPosterPath = (value: unknown) => {
   if (value === null || value === undefined) return null;
-  if (typeof value !== 'string' || !/^\/[\w-]{1,64}\.(jpg|png)$/.test(value)) throw new HttpError(400, 'Invalid poster_path');
+  if (typeof value !== 'string' || !POSTER_PATH.test(value)) throw new HttpError(400, 'Invalid poster_path');
   return value;
 };
 
@@ -123,6 +125,24 @@ const countItems = async (db: D1Database, listId: number) =>
 
 const NEXT_QUEUE_POSITION = "(SELECT COALESCE(MAX(position), 0) + 1 FROM items WHERE list_id = ? AND status = 'queue')";
 
+// --- TMDB (the key stays here; the browser only sees the results) ---
+
+/** Movies and shows; `language` like "ru-RU". Accepts a v3 API key or a v4 read access token (JWT, "eyJ…"). */
+const searchTmdb = async (query: string, language: string, apiKey: string) => {
+  const url = new URL('https://api.themoviedb.org/3/search/multi');
+  url.searchParams.set('query', query);
+  url.searchParams.set('language', language);
+  url.searchParams.set('include_adult', 'false');
+  const headers: Record<string, string> = {};
+  if (apiKey.startsWith('eyJ')) headers.Authorization = `Bearer ${apiKey}`;
+  else url.searchParams.set('api_key', apiKey);
+
+  // Same query → same answer for a day; saves TMDB requests while the streamer types.
+  const response = await fetch(url, { headers, cf: { cacheTtl: 86400, cacheEverything: true } });
+  if (!response.ok) throw new Error(`TMDB ${response.status}`);
+  return toTmdbResults(await response.json());
+};
+
 // --- Twitch snapshot ---
 
 // ponytail: one publish per write request, no cross-request debounce; concurrent writes may land out of order
@@ -173,6 +193,20 @@ const handleApi = async (request: Request, env: Env, channelId: string, route: s
   switch (route) {
     case 'GET /api/channel':
       return { lists: await loadChannel(db, channelId) };
+
+    case 'GET /api/tmdb/search': {
+      const params = new URL(request.url).searchParams;
+      const query = params.get('q')?.trim() ?? '';
+      if (!query || query.length > 100) throw new HttpError(400, 'q must be 1–100 characters');
+      if (!env.TMDB_API_KEY) throw new HttpError(503, 'TMDB is not configured');
+      const language = params.get('lang') === 'ru' ? 'ru-RU' : 'en-US';
+      try {
+        return await searchTmdb(query, language, env.TMDB_API_KEY);
+      } catch (error) {
+        console.error(error);
+        throw new HttpError(502, 'TMDB is unavailable');
+      }
+    }
 
     case 'POST /api/lists': {
       const body = await readBody(request);

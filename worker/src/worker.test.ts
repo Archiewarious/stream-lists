@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { signJwt, verifyJwt } from './jwt';
 import { buildSnapshot, getByteSize, SNAPSHOT_LIMIT_BYTES, type ChannelList, type ItemRow } from './snapshot';
+import { toTmdbResults } from './tmdb';
 
 const secret = btoa('test-extension-secret-0123456789');
 const exp = Math.floor(Date.now() / 1000) + 60;
@@ -58,5 +59,23 @@ describe('buildSnapshot', () => {
     expect(snapshot.lists[0]).toMatchObject({ qn: 40, wn: 40 });
     expect(snapshot.lists[0].q.length).toBeGreaterThan(0);
     expect(snapshot.lists[0].q[0].i).toBe(1);
+  });
+});
+
+describe('toTmdbResults', () => {
+  it('keeps movies and shows, takes the year from either date, drops odd poster paths', () => {
+    const results = toTmdbResults({
+      results: [
+        { id: 693134, media_type: 'movie', title: 'Дюна: Часть вторая', release_date: '2024-02-27', poster_path: '/abc.jpg' },
+        { id: 94605, media_type: 'tv', name: 'Аркейн', first_air_date: '2021-11-06', poster_path: '/../evil.jpg' },
+        { id: 1, media_type: 'person', name: 'Тимоти Шаламе' },
+        { id: 2, media_type: 'movie', title: 'Без даты', release_date: '' },
+      ],
+    });
+    expect(results).toEqual([
+      { tmdb_id: 693134, title: 'Дюна: Часть вторая', year: 2024, poster_path: '/abc.jpg', type: 'movie' },
+      { tmdb_id: 94605, title: 'Аркейн', year: 2021, poster_path: null, type: 'tv' },
+      { tmdb_id: 2, title: 'Без даты', year: null, poster_path: null, type: 'movie' },
+    ]);
   });
 });

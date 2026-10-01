@@ -10,15 +10,39 @@
     "custom": "Custom"
   },
   "status": {
-    "games": { "now": "Playing now", "queue": "Up next", "done": "Completed" },
-    "movies": { "now": "Watching now", "queue": "Up next", "done": "Watched" },
-    "custom": { "now": "Now", "queue": "Up next", "done": "Done" }
+    "games": {
+      "now": "Playing now",
+      "queue": "Up next",
+      "done": "Completed"
+    },
+    "movies": {
+      "now": "Watching now",
+      "queue": "Up next",
+      "done": "Watched"
+    },
+    "custom": {
+      "now": "Now",
+      "queue": "Up next",
+      "done": "Done"
+    }
   },
   "columns": {
     "queue": "Up next",
-    "games": { "watched": "Completed", "markWatched": "Completed", "toWatched": "Straight to completed" },
-    "movies": { "watched": "Watched", "markWatched": "Watched", "toWatched": "Straight to watched" },
-    "custom": { "watched": "Done", "markWatched": "Done", "toWatched": "Straight to done" }
+    "games": {
+      "watched": "Completed",
+      "markWatched": "Completed",
+      "toWatched": "Straight to completed"
+    },
+    "movies": {
+      "watched": "Watched",
+      "markWatched": "Watched",
+      "toWatched": "Straight to watched"
+    },
+    "custom": {
+      "watched": "Done",
+      "markWatched": "Done",
+      "toWatched": "Straight to done"
+    }
   },
   "panel": {
     "empty": "No lists yet",
@@ -54,5 +78,12 @@
     "saveFailed": "Not saved: {{error}}",
     "loadFailed": "Couldn't load the lists: {{error}}",
     "retry": "Retry"
+  },
+  "movies": {
+    "searchPlaceholder": "Find a movie — poster and year come along",
+    "movie": "movie",
+    "tv": "show",
+    "withoutPoster": "Add \"{{title}}\" without a poster",
+    "tmdb": "Posters and years from TMDB"
   }
 }
