@@ -344,11 +344,15 @@ export default {
       const token = request.headers.get('Authorization')?.replace(/^Bearer /, '') ?? '';
       const claims = await verifyJwt(token, env.EXTENSION_SECRET);
       if (!claims) throw new HttpError(401, 'Invalid Twitch token');
-      if (claims.role !== 'broadcaster') throw new HttpError(403, 'Only the broadcaster can edit lists');
 
       const { pathname } = new URL(request.url);
       const route = `${request.method} ${pathname.replace(/\/\d+(?=\/|$)/, '/:id')}`;
       const id = Number(pathname.match(/\/(\d+)(?=\/|$)/)?.[1]);
+
+      // Viewers read the full lists of the channel they are watching (history and search beyond the snapshot).
+      // ponytail: one D1 read per viewer request, no edge cache; add caches.default keyed by channel if traffic grows.
+      if (route === 'GET /api/viewer/channel') return json({ lists: await loadChannel(env.DB, claims.channel_id) });
+      if (claims.role !== 'broadcaster') throw new HttpError(403, 'Only the broadcaster can edit lists');
 
       const data = await handleApi(request, env, claims.channel_id, route, id);
       if (request.method !== 'GET') ctx.waitUntil(publishSnapshot(env, claims.channel_id));

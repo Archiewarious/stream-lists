@@ -1,52 +1,45 @@
 {
-  "kinds": {
-    "games": "Игры",
-    "movies": "Фильмы и сериалы",
-    "custom": "Своё"
-  },
   "kindsShort": {
     "games": "Игры",
     "movies": "Фильмы",
     "custom": "Своё"
-  },
-  "status": {
-    "games": {
-      "now": "Играем сейчас",
-      "queue": "В очереди",
-      "done": "Пройдено"
-    },
-    "movies": {
-      "now": "Смотрим сейчас",
-      "queue": "В очереди",
-      "done": "Просмотрено"
-    },
-    "custom": {
-      "now": "Сейчас",
-      "queue": "В очереди",
-      "done": "Готово"
-    }
   },
   "columns": {
     "queue": "Очередь",
     "games": {
       "watched": "Пройдено",
       "markWatched": "Пройдено",
-      "toWatched": "Сразу в пройденные"
+      "toWatched": "Сразу в пройденные",
+      "seenChip": "Прошли {{date}}",
+      "notFound": "Не нашлось — в эту ещё не играли",
+      "emptyWatched": "Пока ничего не прошли"
     },
     "movies": {
       "watched": "Просмотрено",
       "markWatched": "Просмотрено",
-      "toWatched": "Сразу в просмотренные"
+      "toWatched": "Сразу в просмотренные",
+      "seenChip": "Смотрели {{date}}",
+      "notFound": "Не нашлось — такое ещё не смотрели",
+      "emptyWatched": "Пока ничего не посмотрели"
     },
     "custom": {
       "watched": "Готово",
       "markWatched": "Готово",
-      "toWatched": "Сразу в готовое"
+      "toWatched": "Сразу в готовое",
+      "seenChip": "Готово {{date}}",
+      "notFound": "Не нашлось",
+      "emptyWatched": "Пока ничего не готово"
     }
   },
   "panel": {
     "empty": "Стример пока не добавил списки",
-    "emptyList": "Список пока пуст"
+    "emptyQueue": "Очередь пуста",
+    "searchMovies": "Найти фильм",
+    "search": "Найти",
+    "clear": "Очистить",
+    "found": "Нашлось {{count}} из {{total}}",
+    "inQueue": "В очереди · {{position}}",
+    "more": "Ещё {{count}}"
   },
   "config": {
     "yourLists": "Ваши списки",

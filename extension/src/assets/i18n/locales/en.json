@@ -1,52 +1,45 @@
 {
-  "kinds": {
-    "games": "Games",
-    "movies": "Movies & shows",
-    "custom": "Custom"
-  },
   "kindsShort": {
     "games": "Games",
     "movies": "Movies",
     "custom": "Custom"
-  },
-  "status": {
-    "games": {
-      "now": "Playing now",
-      "queue": "Up next",
-      "done": "Completed"
-    },
-    "movies": {
-      "now": "Watching now",
-      "queue": "Up next",
-      "done": "Watched"
-    },
-    "custom": {
-      "now": "Now",
-      "queue": "Up next",
-      "done": "Done"
-    }
   },
   "columns": {
     "queue": "Up next",
     "games": {
       "watched": "Completed",
       "markWatched": "Completed",
-      "toWatched": "Straight to completed"
+      "toWatched": "Straight to completed",
+      "seenChip": "Played {{date}}",
+      "notFound": "Not found — not played yet",
+      "emptyWatched": "Nothing completed yet"
     },
     "movies": {
       "watched": "Watched",
       "markWatched": "Watched",
-      "toWatched": "Straight to watched"
+      "toWatched": "Straight to watched",
+      "seenChip": "Watched {{date}}",
+      "notFound": "Not found — not watched yet",
+      "emptyWatched": "Nothing watched yet"
     },
     "custom": {
       "watched": "Done",
       "markWatched": "Done",
-      "toWatched": "Straight to done"
+      "toWatched": "Straight to done",
+      "seenChip": "Done {{date}}",
+      "notFound": "Not found",
+      "emptyWatched": "Nothing done yet"
     }
   },
   "panel": {
     "empty": "No lists yet",
-    "emptyList": "This list is empty for now"
+    "emptyQueue": "The queue is empty",
+    "searchMovies": "Find a movie",
+    "search": "Search",
+    "clear": "Clear",
+    "found": "Found {{count}} of {{total}}",
+    "inQueue": "In queue · {{position}}",
+    "more": "{{count}} more"
   },
   "config": {
     "yourLists": "Your lists",

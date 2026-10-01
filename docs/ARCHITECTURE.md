@@ -58,11 +58,11 @@ items:    id, list_id, title, year, poster_path, tmdb_id, status (queue | watche
 | PUT | `/api/lists/:id/order` | стример | порядок очереди (`ids` по порядку) |
 | POST/PATCH/DELETE | `/api/items[/:id]` | стример | элементы, статус, порядок |
 | POST | `/api/items/bulk` | стример | вставка «Списком» |
-| GET | `/api/tmdb/search?q=` | стример | подсказки: название, год, постер |
+| GET | `/api/tmdb/search?q=&lang=` | стример | подсказки: название, год, постер (без ключа — 503, добавление без постера) |
 | PUT | `/api/pointauc/token` | стример | сохранить токен (шифрование AES-GCM) |
 | GET | `/api/pointauc/lots` | стример | лоты + статус: новый / в очереди / смотрели |
 | PUT | `/api/theme` | стример | тема и цвета |
-| GET | `/api/public/:channelId/watched?q=&cursor=` | зритель | история и поиск |
+| GET | `/api/viewer/channel` | любой JWT | все списки канала из JWT — панель грузит, только когда снимок урезан и нужен поиск или вся история |
 
 Секреты Worker: `EXTENSION_SECRET`, `TMDB_API_KEY`, `TOKEN_ENCRYPTION_KEY`.
 Адрес: `https://stream-lists.begidan32.workers.dev` (Cloudflare-аккаунт begidan32, D1 `stream-lists`).
@@ -117,12 +117,13 @@ extension/src/
 ## Разработка
 
 ```
-npm run dev          # extension: http://[::1]:5173/config.html и /panel.html — Twitch имитируется
+npm run dev          # extension: http://[::1]:5173/config.html, /panel.html, /ui.html — Twitch имитируется,
+                     # запросы идут в локальный Worker (worker/: npm run dev:ext) с JWT на тестовом секрете
 npm test             # чистая логика
 npm run build        # dist → zip (tar.exe -a -cf ... -C dist panel.html config.html assets)
 
 # worker/
 npm test             # JWT и снимок
-npm run dev          # wrangler dev; секрет — в .dev.vars; локальные миграции: npx wrangler d1 migrations apply stream-lists --local
+npm run dev:ext      # wrangler dev на 127.0.0.1:8787 с тестовым секретом для имитации; ключ TMDB для подсказок — в .dev.vars; локальные миграции: npx wrangler d1 migrations apply stream-lists --local
 npm run deploy       # миграции на удалённую D1 + выкладка
 ```
