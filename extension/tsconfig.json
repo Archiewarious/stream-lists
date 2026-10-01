@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "resolveJsonModule": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "types": ["vite/client", "twitch-ext"],
+    "paths": {
+      "@app/*": ["./src/app/*"],
+      "@assets/*": ["./src/assets/*"],
+      "@domains/*": ["./src/domains/*"],
+      "@pages/*": ["./src/pages/*"],
+      "@shared/*": ["./src/shared/*"]
+    }
+  },
+  "include": ["src"]
+}

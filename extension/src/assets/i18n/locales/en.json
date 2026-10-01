@@ -1,0 +1,33 @@
+{
+  "kinds": {
+    "games": "Games",
+    "movies": "Movies & shows",
+    "custom": "Custom"
+  },
+  "status": {
+    "games": { "now": "Playing now", "queue": "Up next", "done": "Completed" },
+    "movies": { "now": "Watching now", "queue": "Up next", "done": "Watched" },
+    "custom": { "now": "Now", "queue": "Up next", "done": "Done" }
+  },
+  "panel": {
+    "empty": "No lists yet",
+    "emptyList": "This list is empty for now"
+  },
+  "config": {
+    "createFirst": "Create your first list",
+    "newList": "New list",
+    "listTitle": "List name",
+    "create": "Create",
+    "deleteList": "Delete list",
+    "deleteListConfirm": "Delete \"{{title}}\" with all its items?",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "addItemPlaceholder": "Add to the queue…",
+    "add": "Add",
+    "emptyList": "The list is empty — add the first item above",
+    "remove": "Remove",
+    "storage": "Storage: {{used}} of {{total}} KB",
+    "overLimit": "This doesn't fit into Twitch storage (5 KB). Remove some items or lists.",
+    "corrupted": "Saved data could not be read. Editing is disabled so it isn't overwritten."
+  }
+}
