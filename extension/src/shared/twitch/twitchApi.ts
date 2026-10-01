@@ -1,10 +1,7 @@
 import { createDevTwitchApi } from '@shared/twitch/devTwitchApi';
 
-export type TwitchTheme = 'light' | 'dark';
-
 /** The subset of Twitch.ext the extension uses — so it can be swapped for a local imitation. */
 export interface TwitchApi {
-  onThemeChanged: (callback: (theme: TwitchTheme) => void) => void;
   getBroadcasterConfig: () => string | undefined;
   onConfigChanged: (callback: () => void) => void;
   setBroadcasterConfig: (content: string) => void;
@@ -16,11 +13,6 @@ export interface TwitchApi {
 const CONFIG_VERSION = '1';
 
 const realTwitchApi: TwitchApi = {
-  onThemeChanged: (callback) =>
-    Twitch.ext.onContext((context) => {
-      const { theme } = context as Partial<Twitch.ext.Context>;
-      if (theme) callback(theme);
-    }),
   getBroadcasterConfig: () => Twitch.ext.configuration.broadcaster?.content,
   onConfigChanged: (callback) => Twitch.ext.configuration.onChanged(callback),
   setBroadcasterConfig: (content) => Twitch.ext.configuration.set('broadcaster', CONFIG_VERSION, content),

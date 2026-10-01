@@ -5,8 +5,213 @@
 @import 'tailwindcss/utilities.css' layer(utilities);
 @import '@mantine/core/styles.layer.css';
 
+/* Theme: four base colors (set by applyTheme; defaults = PRESETS.fox), everything else is derived. */
+:root {
+  --bg: #140b1f;
+  --primary-hi: #f290ff;
+  --primary-lo: #9a2fe0;
+  --accent: #ff7ac1;
+  --gold: #ffb14a; /* "New" chips and the warm aurora glow — the same in every theme */
+
+  --primary: color-mix(in oklab, var(--primary-hi), var(--primary-lo));
+  --tint: color-mix(in oklab, var(--primary-hi), white 35%);
+  --text: color-mix(in srgb, var(--tint) 8%, white);
+  --text-2: color-mix(in srgb, var(--text) 72%, transparent);
+  --text-3: color-mix(in srgb, var(--text) 48%, transparent);
+
+  --glass: linear-gradient(
+    160deg,
+    color-mix(in srgb, var(--tint) 17%, transparent),
+    color-mix(in srgb, var(--primary) 7%, transparent) 55%,
+    color-mix(in srgb, var(--accent) 9%, transparent)
+  );
+  --glass-edge: color-mix(in srgb, var(--tint) 26%, transparent);
+  --glass-shine: inset 0 1px 0 color-mix(in srgb, var(--text) 45%, transparent), inset 0 -1px 0 rgb(255 255 255 / 0.06);
+  --selected: color-mix(in srgb, var(--tint) 20%, transparent);
+  --glow: color-mix(in srgb, var(--primary-hi) 55%, transparent);
+  --ring: 0 0 0 2px color-mix(in srgb, var(--primary-hi) 65%, transparent),
+    0 0 18px color-mix(in srgb, var(--primary-hi) 35%, transparent);
+  --aurora: radial-gradient(130% 100% at 50% 0%, transparent 45%, rgb(0 0 0 / 0.4) 100%),
+    radial-gradient(70% 50% at 10% 0%, color-mix(in srgb, var(--primary) 55%, transparent), transparent 70%),
+    radial-gradient(55% 45% at 105% 35%, color-mix(in srgb, var(--accent) 34%, transparent), transparent 70%),
+    radial-gradient(45% 35% at 75% 105%, color-mix(in srgb, var(--gold) 20%, transparent), transparent 70%), var(--bg);
+
+  --sans: Nunito, system-ui, sans-serif;
+  --script: 'Great Vibes', cursive;
+}
+
+/* Tailwind utilities: text-fg-2, bg-primary, font-script… */
+@theme inline {
+  --font-sans: var(--sans);
+  --font-script: var(--script);
+  --color-fg: var(--text);
+  --color-fg-2: var(--text-2);
+  --color-fg-3: var(--text-3);
+  --color-primary: var(--primary);
+  --color-accent: var(--accent);
+  --color-gold: var(--gold);
+}
+
 html,
 body,
 #root {
   height: 100%;
+}
+
+@layer components {
+  body {
+    background: var(--aurora);
+    color: var(--text);
+    font-weight: 600;
+  }
+
+  .glass,
+  .mantine-Modal-content,
+  .mantine-Popover-dropdown {
+    background: var(--glass);
+    backdrop-filter: blur(26px) saturate(170%);
+    border: 1px solid var(--glass-edge);
+    box-shadow: var(--glass-shine), 0 12px 32px rgb(0 0 0 / 0.28);
+  }
+
+  .glass-soft,
+  .mantine-Button-root[data-variant='default'],
+  .mantine-Input-input,
+  .mantine-SegmentedControl-root {
+    background: rgb(255 255 255 / 0.07);
+    backdrop-filter: blur(18px);
+    border: 1px solid rgb(255 255 255 / 0.1);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.12);
+  }
+
+  .selected,
+  .mantine-SegmentedControl-indicator,
+  [data-combobox-option][data-combobox-selected],
+  [data-combobox-option]:hover {
+    background: var(--selected);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text) 40%, transparent),
+      0 2px 10px color-mix(in srgb, var(--primary-lo) 25%, transparent);
+  }
+
+  .script,
+  .mantine-Title-root {
+    font-family: var(--script);
+    font-weight: 400;
+    line-height: 1;
+    text-shadow: 0 0 14px var(--glow);
+  }
+
+  .label {
+    font: 800 11px var(--sans);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-3);
+  }
+
+  .chip {
+    --chip: var(--tint);
+    font-size: 11px;
+    font-weight: 700;
+    padding: 4px 9px;
+    border-radius: 999px;
+    white-space: nowrap;
+    color: var(--chip);
+    background: color-mix(in srgb, var(--chip) 15%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--chip) 38%, transparent);
+  }
+  .chip-seen {
+    --chip: color-mix(in oklab, var(--accent), white 25%);
+  }
+  .chip-new {
+    --chip: color-mix(in oklab, var(--gold), white 25%);
+  }
+
+  .poster {
+    flex-shrink: 0;
+    border-radius: 6px;
+    object-fit: cover;
+    background: rgb(255 255 255 / 0.08);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--tint) 20%, transparent), 0 4px 12px rgb(0 0 0 / 0.45);
+  }
+
+  /* Mantine in glass */
+  .mantine-Button-root {
+    border-radius: 999px;
+    font-weight: 700;
+    color: var(--text);
+    transition: filter 0.15s;
+  }
+  .mantine-Button-root[data-variant='default']:hover {
+    background: rgb(255 255 255 / 0.13);
+  }
+  .mantine-Button-root[data-variant='filled'] {
+    background: linear-gradient(180deg, var(--primary-hi), var(--primary) 48%, var(--primary-lo));
+    color: #fff;
+    text-shadow: 0 1px 2px rgb(0 0 0 / 0.25);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.6),
+      inset 0 -3px 8px color-mix(in srgb, var(--primary-lo) 60%, black),
+      0 6px 20px color-mix(in srgb, var(--primary) 50%, transparent);
+  }
+  .mantine-Button-root[data-variant='filled']:hover {
+    filter: brightness(1.08);
+  }
+  .mantine-Button-root[data-variant='filled'] .mantine-Button-label::after {
+    content: '✦';
+    font-size: 10px;
+    margin-left: 6px;
+    opacity: 0.9;
+  }
+  .mantine-Button-root[data-disabled] {
+    opacity: 0.45;
+  }
+
+  .mantine-Input-input {
+    color: var(--text);
+    font-weight: 600;
+  }
+  .mantine-Input-input:focus {
+    border-color: transparent;
+    box-shadow: var(--glass-shine), var(--ring);
+  }
+
+  .mantine-SegmentedControl-root {
+    padding: 3px;
+  }
+  .mantine-SegmentedControl-label {
+    color: var(--text-2);
+    font-weight: 700;
+  }
+  .mantine-SegmentedControl-label[data-active] {
+    color: var(--text);
+  }
+
+  .mantine-Checkbox-input {
+    border-radius: 7px;
+    background: transparent;
+    border: 1.5px solid color-mix(in srgb, var(--text) 35%, transparent);
+  }
+  .mantine-Checkbox-input:checked {
+    background: linear-gradient(180deg, var(--primary-hi), var(--primary-lo));
+    border-color: transparent;
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.55);
+  }
+
+  .mantine-Modal-content {
+    border-radius: 26px;
+  }
+  .mantine-Modal-header {
+    background: transparent;
+  }
+  .mantine-Popover-dropdown {
+    border-radius: 22px;
+    padding: 8px;
+  }
+  [data-combobox-option] {
+    border-radius: 14px;
+    font-weight: 700;
+  }
+
+  .mantine-ScrollArea-thumb {
+    background: color-mix(in srgb, var(--tint) 35%, transparent);
+  }
 }

@@ -71,9 +71,13 @@ CORS `*`: токен идёт в заголовке, не в cookie. Снимо�
 ## Фронтенд
 
 React 19 + Vite + TypeScript, Mantine (поведение: Combobox, Modal, Popover, ScrollArea) + Tailwind
-(внешний вид), dnd-kit (порядок очереди), i18next ru/en, шрифты в сборке: Great Vibes + Marck Script
-(заголовки), Nunito (текст). Тема — CSS-переменные; пресеты: Лиловая лисичка, Twitch, Закат, Мята,
-Лёд, Вишня + свои цвета. Структура по соглашениям Pointauc (`AGENTS.md`):
+(внешний вид), dnd-kit (порядок очереди), i18next ru/en, шрифты в сборке (@fontsource, latin + cyrillic):
+Great Vibes (заголовки, кириллица в нём есть), Nunito 600–800 (текст). Тема — CSS-переменные: у пресета
+4 цвета (`--bg`, `--primary-hi`, `--primary-lo`, `--accent`, см. `app/presets.ts`), стекло, чипы и сияние
+выводятся из них через `color-mix()` в `app/styles.css`; Mantine перекрашивается через `cssVariablesResolver`.
+Пресеты: Лиловая лисичка, Twitch, Закат, Мята, Лёд, Вишня + свои цвета. Всегда тёмная (тема стримера,
+а не светлая/тёмная Twitch). Витрина компонентов: `npm run dev` → `/ui.html` (в сборку не входит).
+Структура по соглашениям Pointauc (`AGENTS.md`):
 
 ```
 extension/src/
