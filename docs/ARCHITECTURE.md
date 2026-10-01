@@ -46,7 +46,11 @@ items:    id, list_id, title, year, poster_path, tmdb_id, status (queue | watche
 ```
 
 Сопоставление с Pointauc и поиск повторов — по нормализованному названию (trim + lowercase).
-Таблица `channels` (тема, токен Pointauc) добавится миграцией на этапах 6–7. Данные фазы 1 не переносятся
+```
+channels: channel_id, theme (JSON: { preset } | { primary, accent }), pointauc_token (AES-GCM)
+```
+
+Миграции: 0001 списки, 0002 channels, 0003 токен Pointauc. Данные фазы 1 не переносятся
 (были только тестовые на канале автора).
 
 ## Worker API
@@ -59,9 +63,9 @@ items:    id, list_id, title, year, poster_path, tmdb_id, status (queue | watche
 | POST/PATCH/DELETE | `/api/items[/:id]` | стример | элементы, статус, порядок |
 | POST | `/api/items/bulk` | стример | вставка «Списком» |
 | GET | `/api/tmdb/search?q=&lang=` | стример | подсказки: название, год, постер (без ключа — 503, добавление без постера) |
-| PUT | `/api/pointauc/token` | стример | сохранить токен (шифрование AES-GCM) |
-| GET | `/api/pointauc/lots` | стример | лоты + статус: новый / в очереди / смотрели |
-| PUT | `/api/theme` | стример | тема и цвета |
+| PUT/DELETE | `/api/pointauc/token` | стример | подключить (токен проверяется запросом к Pointauc, хранится AES-GCM) / отключить |
+| GET | `/api/pointauc/lots?list_id=` | стример | лоты + статус: новый / в очереди · N / смотрели <дата>; импорт — `/api/items/bulk` с `source: pointauc` |
+| PUT | `/api/theme` | стример | тема и цвета; тема идёт в снимок (`th`) |
 | GET | `/api/viewer/channel` | любой JWT | все списки канала из JWT — панель грузит, только когда снимок урезан и нужен поиск или вся история |
 
 Секреты Worker: `EXTENSION_SECRET`, `TMDB_API_KEY`, `TOKEN_ENCRYPTION_KEY`.
@@ -91,6 +95,9 @@ extension/src/
 ```
 
 ## Этапы реализации
+
+Статус (2026-10-02): 1–7 сделаны и проверены локально; 2–7 закоммичены, но не запушены и Worker с ними не выложен.
+Материалы ревью — [`docs/review/`](review/README.md).
 
 | # | Что | Проверка | Нужно от пользователя |
 |---|---|---|---|

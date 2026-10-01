@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<title>Stream Lists — review assets</title>
+<!-- Renders the Twitch review images; open with #panels, #logo or #discovery and screenshot the viewport. -->
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800&family=Great+Vibes&display=swap" rel="stylesheet" />
+<style>
+  * { box-sizing: border-box; margin: 0; }
+  body { font-family: Nunito, sans-serif; color: #fff7ff; overflow: hidden;
+    background:
+      radial-gradient(130% 100% at 50% 0%, transparent 45%, rgb(0 0 0 / 0.4) 100%),
+      radial-gradient(70% 50% at 10% 0%, rgb(198 80 244 / 0.55), transparent 70%),
+      radial-gradient(55% 45% at 105% 35%, rgb(255 122 193 / 0.34), transparent 70%),
+      radial-gradient(45% 35% at 75% 105%, rgb(255 177 74 / 0.2), transparent 70%), #140b1f; }
+  .view { display: none; }
+  .script { font-family: 'Great Vibes', cursive; font-weight: 400; line-height: 1; text-shadow: 0 0 18px rgb(242 144 255 / 0.55); }
+
+  /* 1024×768: three panel states */
+  #panels { width: 1024px; height: 768px; padding: 34px 35px 0; }
+  #panels h1 { font-size: 64px; text-align: center; }
+  #panels p.sub { text-align: center; font-weight: 700; color: rgb(255 240 255 / 0.72); margin: 6px 0 26px; font-size: 17px; }
+  #panels .row { display: flex; gap: 20px; justify-content: center; }
+  #panels figure { width: 300px; }
+  #panels img { width: 300px; height: 472px; border-radius: 16px; display: block;
+    box-shadow: 0 0 0 1px rgb(242 208 255 / 0.28), 0 18px 40px rgb(0 0 0 / 0.45); }
+  #panels figcaption { text-align: center; font-weight: 800; font-size: 15px; margin-top: 14px; color: rgb(255 240 255 / 0.8); }
+
+  /* 100×100 logo */
+  #logo { width: 100px; height: 100px; position: relative; overflow: hidden;
+    background: radial-gradient(90% 90% at 20% 10%, #c650f4, transparent 70%), radial-gradient(80% 80% at 100% 100%, #ff7ac1, transparent 70%), #1d0f2e; }
+  .rows { position: absolute; inset: 20px 18px; display: flex; flex-direction: column; gap: 9px; }
+  .rows i { display: flex; align-items: center; gap: 6px; height: 14px; }
+  .rows i::before { content: ''; width: 10px; height: 14px; border-radius: 3px; background: linear-gradient(180deg, #ffd6ff, #f290ff); box-shadow: 0 0 6px rgb(255 214 255 / 0.6); }
+  .rows i::after { content: ''; flex: 1; height: 8px; border-radius: 99px; background: rgb(255 247 255 / 0.92); }
+  .rows i:nth-child(2)::after { margin-right: 14px; }
+  .rows i:nth-child(3)::after { margin-right: 6px; opacity: 0.55; }
+  .star { position: absolute; right: 9px; bottom: 5px; font-size: 22px; color: #ffc56b; text-shadow: 0 0 10px rgb(255 197 107 / 0.9); }
+
+  /* 300×200 discovery image */
+  #discovery { width: 300px; height: 200px; padding: 26px 22px; position: relative; overflow: hidden; }
+  #discovery h2 { font-size: 50px; }
+  #discovery .tag { font-weight: 800; font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: rgb(255 240 255 / 0.75); margin-top: 6px; }
+  #discovery .chips { display: flex; gap: 6px; margin-top: 22px; flex-wrap: wrap; }
+  #discovery .chip { font-weight: 800; font-size: 11px; padding: 5px 10px; border-radius: 99px; }
+  .seen { color: #ff9bd0; background: rgb(255 122 193 / 0.16); box-shadow: inset 0 0 0 1px rgb(255 122 193 / 0.4); }
+  .queue { color: #e3c8ff; background: rgb(214 170 255 / 0.14); box-shadow: inset 0 0 0 1px rgb(214 170 255 / 0.3); }
+  .new { color: #ffc56b; background: rgb(255 177 74 / 0.15); box-shadow: inset 0 0 0 1px rgb(255 177 74 / 0.4); }
+  #discovery .star { right: 20px; top: 18px; bottom: auto; font-size: 30px; }
+</style>
+</head>
+<body>
+  <section id="panels" class="view">
+    <h1 class="script">Stream Lists</h1>
+    <p class="sub">Очередь фильмов и игр стримера — прямо под стримом</p>
+    <div class="row">
+      <figure><img src="raw-panel-queue.png" alt="" /><figcaption>Что смотрим дальше</figcaption></figure>
+      <figure><img src="raw-panel-watched.png" alt="" /><figcaption>Что уже посмотрели — по месяцам</figcaption></figure>
+      <figure><img src="raw-panel-search.png" alt="" /><figcaption>«А это уже смотрели?»</figcaption></figure>
+    </div>
+  </section>
+
+  <section id="logo" class="view">
+    <div class="rows"><i></i><i></i><i></i></div>
+    <span class="star">✦</span>
+  </section>
+
+  <section id="discovery" class="view">
+    <h2 class="script">Stream Lists</h2>
+    <div class="tag">Games &amp; Movies</div>
+    <div class="chips">
+      <span class="chip queue">Up next · 1</span>
+      <span class="chip seen">Watched Sep 18</span>
+      <span class="chip new">New</span>
+    </div>
+    <span class="star">✦</span>
+  </section>
+
+  <script>
+    const show = () => document.querySelectorAll('.view').forEach((view) => (view.style.display = '#' + view.id === location.hash ? 'block' : 'none'));
+    addEventListener('hashchange', show);
+    show();
+  </script>
+</body>
+</html>
