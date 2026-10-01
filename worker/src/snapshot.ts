@@ -1,3 +1,5 @@
+import type { ChannelTheme } from './theme';
+
 // The public snapshot viewers read from the Twitch config segment (and receive via PubSub). Both cap at 5 KB.
 
 export interface ListRow {
@@ -49,7 +51,7 @@ const compactItem = (item: ItemRow) => ({
 
 export const getByteSize = (content: string) => new TextEncoder().encode(content).length;
 
-export const buildSnapshot = (lists: ChannelList[]): string => {
+export const buildSnapshot = (lists: ChannelList[], theme: ChannelTheme | null = null): string => {
   const sections = lists.map((list) => ({
     list,
     queue: list.items.filter((item) => item.status === 'queue'),
@@ -59,6 +61,7 @@ export const buildSnapshot = (lists: ChannelList[]): string => {
   for (const [queueLimit, watchedLimit] of SNAPSHOT_STEPS) {
     const content = JSON.stringify({
       v: Number(SNAPSHOT_VERSION),
+      th: theme ?? undefined,
       lists: sections.map(({ list, queue, watched }) => ({
         i: list.id,
         t: list.title,

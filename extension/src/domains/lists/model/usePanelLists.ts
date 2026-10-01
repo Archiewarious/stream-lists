@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { ChannelList } from '@worker/snapshot';
+import { applyTheme } from '@app/presets';
 import { fromChannelLists, parseSnapshot, type PanelList } from '@domains/lists/lib/panelLists';
 import { callWorker } from '@shared/api/workerApi';
 import { twitchApi } from '@shared/twitch/twitchApi';
@@ -10,7 +11,7 @@ import { twitchApi } from '@shared/twitch/twitchApi';
  * the full lists (whole history, search) are fetched from the Worker only when the viewer needs them.
  */
 export const usePanelLists = () => {
-  const [snapshot, setSnapshot] = useState<PanelList[] | null>(null);
+  const [snapshotLists, setSnapshotLists] = useState<PanelList[] | null>(null);
   const [full, setFull] = useState<PanelList[] | null>(null);
   // Bumped on every snapshot: a full fetch started before it is stale and dropped.
   const generation = useRef(0);
@@ -20,7 +21,9 @@ export const usePanelLists = () => {
     const applySnapshot = (content: string | undefined) => {
       generation.current += 1;
       fullRequest.current = null;
-      setSnapshot(parseSnapshot(content) ?? []);
+      const snapshot = parseSnapshot(content);
+      setSnapshotLists(snapshot?.lists ?? []);
+      applyTheme(snapshot?.theme ?? null); // viewers see the streamer's theme
       setFull(null);
     };
     twitchApi.onConfigChanged(() => applySnapshot(twitchApi.getBroadcasterConfig()));
@@ -38,5 +41,5 @@ export const usePanelLists = () => {
       });
   }, []);
 
-  return { lists: full ?? snapshot, isFull: !!full, loadFull };
+  return { lists: full ?? snapshotLists, isFull: !!full, loadFull };
 };

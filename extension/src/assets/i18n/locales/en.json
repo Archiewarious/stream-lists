@@ -78,5 +78,40 @@
     "tv": "show",
     "withoutPoster": "Add \"{{title}}\" without a poster",
     "tmdb": "Posters and years from TMDB"
+  },
+  "appearance": {
+    "title": "Appearance",
+    "subtitle": "Viewers see the panel in the colors you pick",
+    "custom": "Own colors",
+    "primary": "Main",
+    "accent": "Accent",
+    "preview": "What viewers see",
+    "newChip": "New",
+    "presets": {
+      "fox": {
+        "name": "Lilac Fox",
+        "hint": "default"
+      },
+      "twitch": {
+        "name": "Twitch",
+        "hint": "classic purple"
+      },
+      "sunset": {
+        "name": "Sunset",
+        "hint": "coral and peach"
+      },
+      "mint": {
+        "name": "Mint",
+        "hint": "fresh teal"
+      },
+      "ice": {
+        "name": "Ice",
+        "hint": "blue neon"
+      },
+      "cherry": {
+        "name": "Cherry",
+        "hint": "deep red"
+      }
+    }
   }
 }

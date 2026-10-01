@@ -3,6 +3,7 @@ import { IconDots, IconTrash } from '@tabler/icons-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import AppearanceView from '@domains/appearance/ui/AppearanceView';
 import { useChannel, type ItemStatus, type ListKind } from '@domains/lists/model/useChannel';
 import AddItemBar from '@domains/lists/ui/AddItemBar';
 import ListForm from '@domains/lists/ui/ListForm';
@@ -17,12 +18,18 @@ const ConfigPage = () => {
   const { t } = useTranslation();
   const channel = useChannel();
   const [activeListId, setActiveListId] = useState<number | null>(null);
+  const [isAppearanceOpened, setIsAppearanceOpened] = useState(false);
   const [isSettingsOpened, setIsSettingsOpened] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
+  const selectList = (listId: number) => {
+    setActiveListId(listId);
+    setIsAppearanceOpened(false);
+  };
+
   const createList = async (title: string, kind: ListKind) => {
     const list = await channel.createList(title, kind);
-    if (list) setActiveListId(list.id);
+    if (list) selectList(list.id);
   };
 
   if (!channel.lists) {
@@ -69,8 +76,9 @@ const ConfigPage = () => {
     <div className="grid h-full grid-cols-[210px_minmax(0,1fr)] grid-rows-[minmax(0,1fr)] gap-3.5 p-3.5">
       <ListsSidebar
         lists={channel.lists}
-        activeListId={list.id}
-        onSelect={setActiveListId}
+        activeListId={isAppearanceOpened ? null : list.id}
+        onSelect={selectList}
+        onAppearance={() => setIsAppearanceOpened(true)}
         onCreate={createList}
         isSaving={channel.isSaving}
         saveError={channel.saveError}
@@ -79,36 +87,52 @@ const ConfigPage = () => {
       />
 
       <main className="flex min-h-0 min-w-0 flex-col gap-3">
-        <div className="flex items-center gap-3 px-1 pt-1">
-          <Title order={1} size={48} className="min-w-0 flex-1 truncate !leading-[1.25]">
-            {list.title}
-          </Title>
-          <ActionIcon variant="default" size="lg" aria-label={t('config.listSettings')} onClick={() => setIsSettingsOpened(true)}>
-            <IconDots size={18} />
-          </ActionIcon>
-        </div>
-
-        <AddItemBar
-          kind={list.kind}
-          onAdd={(title, movie) => channel.addItem(list.id, title, 'queue', movie)}
-          onBulk={addBulk}
-        />
-
-        <div className="grid min-h-0 flex-1 grid-cols-2 grid-rows-[minmax(0,1fr)] gap-3">
-          <QueueColumn
-            kind={list.kind}
-            items={queue}
-            onWatched={(itemId) => channel.setStatus(itemId, 'watched')}
-            onDelete={channel.deleteItem}
-            onReorder={(ids) => channel.reorderQueue(list.id, ids)}
+        {isAppearanceOpened ? (
+          <AppearanceView
+            theme={channel.theme}
+            list={list}
+            onPreview={channel.previewTheme}
+            onSave={channel.saveTheme}
           />
-          <WatchedColumn
-            kind={list.kind}
-            items={watched}
-            onRequeue={(itemId) => channel.setStatus(itemId, 'queue')}
-            onDelete={channel.deleteItem}
-          />
-        </div>
+        ) : (
+          <>
+            <div className="flex items-center gap-3 px-1 pt-1">
+              <Title order={1} size={48} className="min-w-0 flex-1 truncate !leading-[1.25]">
+                {list.title}
+              </Title>
+              <ActionIcon
+                variant="default"
+                size="lg"
+                aria-label={t('config.listSettings')}
+                onClick={() => setIsSettingsOpened(true)}
+              >
+                <IconDots size={18} />
+              </ActionIcon>
+            </div>
+
+            <AddItemBar
+              kind={list.kind}
+              onAdd={(title, movie) => channel.addItem(list.id, title, 'queue', movie)}
+              onBulk={addBulk}
+            />
+
+            <div className="grid min-h-0 flex-1 grid-cols-2 grid-rows-[minmax(0,1fr)] gap-3">
+              <QueueColumn
+                kind={list.kind}
+                items={queue}
+                onWatched={(itemId) => channel.setStatus(itemId, 'watched')}
+                onDelete={channel.deleteItem}
+                onReorder={(ids) => channel.reorderQueue(list.id, ids)}
+              />
+              <WatchedColumn
+                kind={list.kind}
+                items={watched}
+                onRequeue={(itemId) => channel.setStatus(itemId, 'queue')}
+                onDelete={channel.deleteItem}
+              />
+            </div>
+          </>
+        )}
       </main>
 
       <Modal

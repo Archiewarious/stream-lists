@@ -1,4 +1,5 @@
 import type { ChannelList, ItemRow, ListRow } from '@worker/snapshot';
+import { parseTheme, type ChannelTheme } from '@worker/theme';
 
 export type PanelItem = Pick<ItemRow, 'id' | 'title' | 'year' | 'poster_path' | 'watched_at'>;
 
@@ -41,12 +42,17 @@ const fromSnapshotItem = (item: SnapshotItem): PanelItem => ({
   watched_at: item.d ?? null,
 });
 
-/** Lists from the Twitch config snapshot (v2); null for anything else — empty, the old phase-1 format, garbage. */
-export const parseSnapshot = (content: string | undefined): PanelList[] | null => {
+export interface PanelSnapshot {
+  lists: PanelList[];
+  theme: ChannelTheme | null;
+}
+
+/** The Twitch config snapshot (v2); null for anything else — empty, the old phase-1 format, garbage. */
+export const parseSnapshot = (content: string | undefined): PanelSnapshot | null => {
   try {
     const data = JSON.parse(content ?? '');
     if (data?.v !== 2 || !Array.isArray(data.lists)) return null;
-    return data.lists.map((list: SnapshotList) => ({
+    const lists = data.lists.map((list: SnapshotList) => ({
       id: list.i,
       title: list.t,
       kind: list.k,
@@ -55,6 +61,7 @@ export const parseSnapshot = (content: string | undefined): PanelList[] | null =
       queue: list.q.map(fromSnapshotItem),
       watched: list.w.map(fromSnapshotItem),
     }));
+    return { lists, theme: parseTheme(data.th) };
   } catch {
     return null;
   }

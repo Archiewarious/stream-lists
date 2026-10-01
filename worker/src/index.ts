@@ -1,5 +1,6 @@
 import { signJwt, verifyJwt } from './jwt';
 import { buildSnapshot, SNAPSHOT_VERSION, type ChannelList, type ItemRow, type ListRow } from './snapshot';
+import { parseTheme, type ChannelTheme } from './theme';
 import { POSTER_PATH, toTmdbResults } from './tmdb';
 
 interface Env {
@@ -101,6 +102,11 @@ const loadChannel = async (db: D1Database, channelId: string): Promise<ChannelLi
   }));
 };
 
+const loadTheme = async (db: D1Database, channelId: string): Promise<ChannelTheme | null> => {
+  const stored = await db.prepare('SELECT theme FROM channels WHERE channel_id = ?').bind(channelId).first<string | null>('theme');
+  return stored ? parseTheme(JSON.parse(stored)) : null;
+};
+
 const getOwnedList = async (db: D1Database, channelId: string, listId: number) => {
   if (!Number.isInteger(listId)) throw new HttpError(400, 'list_id must be an integer');
   const list = await db
@@ -148,7 +154,7 @@ const searchTmdb = async (query: string, language: string, apiKey: string) => {
 // ponytail: one publish per write request, no cross-request debounce; concurrent writes may land out of order
 // until the next write. Add a Durable Object debounce if Twitch rate limits (config ~20/min per channel) bite.
 const publishSnapshot = async (env: Env, channelId: string) => {
-  const content = buildSnapshot(await loadChannel(env.DB, channelId));
+  const content = buildSnapshot(await loadChannel(env.DB, channelId), await loadTheme(env.DB, channelId));
   const token = await signJwt(
     {
       exp: Math.floor(Date.now() / 1000) + 60,
@@ -192,7 +198,17 @@ const handleApi = async (request: Request, env: Env, channelId: string, route: s
 
   switch (route) {
     case 'GET /api/channel':
-      return { lists: await loadChannel(db, channelId) };
+      return { lists: await loadChannel(db, channelId), theme: await loadTheme(db, channelId) };
+
+    case 'PUT /api/theme': {
+      const theme = parseTheme(await readBody(request));
+      if (!theme) throw new HttpError(400, 'Expected { preset } or { primary, accent } as #rrggbb');
+      await db
+        .prepare('INSERT INTO channels (channel_id, theme) VALUES (?, ?) ON CONFLICT (channel_id) DO UPDATE SET theme = excluded.theme')
+        .bind(channelId, JSON.stringify(theme))
+        .run();
+      return theme;
+    }
 
     case 'GET /api/tmdb/search': {
       const params = new URL(request.url).searchParams;

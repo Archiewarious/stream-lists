@@ -36,7 +36,10 @@ const channel: ChannelList[] = [
 
 describe('parseSnapshot', () => {
   it('reads back what the Worker publishes, same as the full lists', () => {
-    expect(parseSnapshot(buildSnapshot(channel))).toEqual(fromChannelLists(channel));
+    expect(parseSnapshot(buildSnapshot(channel, { preset: 'mint' }))).toEqual({
+      lists: fromChannelLists(channel),
+      theme: { preset: 'mint' },
+    });
   });
 
   it('ignores empty, old and broken content', () => {

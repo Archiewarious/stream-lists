@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { buildSnapshot, type ChannelList, type ItemRow, type ListRow } from '@worker/snapshot';
+import type { ChannelTheme } from '@worker/theme';
+import { applyTheme } from '@app/presets';
 import { callWorker } from '@shared/api/workerApi';
 import { twitchApi } from '@shared/twitch/twitchApi';
 
@@ -22,6 +24,7 @@ const updateItem = (lists: ChannelList[], itemId: number, update: (items: ItemRo
  */
 export const useChannel = () => {
   const [lists, setLists] = useState<ChannelList[] | null>(null);
+  const [theme, setTheme] = useState<ChannelTheme | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -29,10 +32,12 @@ export const useChannel = () => {
 
   const reload = useCallback(async () => {
     try {
-      const { lists: nextLists } = await callWorker<{ lists: ChannelList[] }>('GET', '/api/channel');
-      setLists(nextLists);
+      const channel = await callWorker<{ lists: ChannelList[]; theme: ChannelTheme | null }>('GET', '/api/channel');
+      setLists(channel.lists);
+      setTheme(channel.theme);
+      applyTheme(channel.theme); // the streamer sees their window in the same colors as viewers
       setLoadError(null);
-      if (import.meta.env.DEV) twitchApi.mirrorSnapshot?.(buildSnapshot(nextLists));
+      if (import.meta.env.DEV) twitchApi.mirrorSnapshot?.(buildSnapshot(channel.lists, channel.theme));
     } catch (error) {
       setLoadError((error as Error).message);
     }
@@ -63,11 +68,20 @@ export const useChannel = () => {
 
   return {
     lists,
+    theme,
     loadError,
     reload,
     isSaving,
     saveError,
     clearSaveError: () => setSaveError(null),
+
+    /** Instant local repaint while the streamer is picking; saveTheme stores it for viewers. */
+    previewTheme: (nextTheme: ChannelTheme) => {
+      setTheme(nextTheme);
+      applyTheme(nextTheme);
+    },
+
+    saveTheme: (nextTheme: ChannelTheme) => run(() => callWorker('PUT', '/api/theme', nextTheme)),
 
     createList: (title: string, kind: ListKind) => run(() => callWorker<ListRow>('POST', '/api/lists', { title, kind })),
 

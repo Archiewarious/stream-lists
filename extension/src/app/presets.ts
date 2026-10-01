@@ -1,3 +1,5 @@
+import type { ChannelTheme, ThemePreset } from '@worker/theme';
+
 /** A theme is four colors; glass, chips, glow and the aurora background are derived from them in styles.css. */
 export interface ThemeColors {
   bg: string;
@@ -16,11 +18,26 @@ export const PRESETS = {
   mint: { bg: '#0a1615', primaryHi: '#8ff5d6', primaryLo: '#1aa889', accent: '#7fd4ff' },
   ice: { bg: '#0a1020', primaryHi: '#b4e1ff', primaryLo: '#4a86ff', accent: '#9f8bff' },
   cherry: { bg: '#1a0a10', primaryHi: '#ff8aa8', primaryLo: '#c4123f', accent: '#ffb36b' },
-} satisfies Record<string, ThemeColors>;
+} satisfies Record<ThemePreset, ThemeColors>;
 
-export type PresetId = keyof typeof PRESETS;
+export type PresetId = ThemePreset;
 
-export const applyTheme = ({ bg, primaryHi, primaryLo, accent }: ThemeColors) => {
+export const DEFAULT_THEME: ChannelTheme = { preset: 'fox' };
+
+/** Own colors: one main color gives the gradient and a dark tinted background (CSS color-mix, no JS color math). */
+export const getThemeColors = (theme: ChannelTheme | null): ThemeColors => {
+  if (!theme) return PRESETS.fox;
+  if ('preset' in theme) return PRESETS[theme.preset];
+  return {
+    bg: `color-mix(in oklab, ${theme.primary} 12%, #0b0710)`,
+    primaryHi: `color-mix(in oklab, ${theme.primary}, white 40%)`,
+    primaryLo: `color-mix(in oklab, ${theme.primary}, black 25%)`,
+    accent: theme.accent,
+  };
+};
+
+export const applyTheme = (theme: ChannelTheme | null) => {
+  const { bg, primaryHi, primaryLo, accent } = getThemeColors(theme);
   const { style } = document.documentElement;
   style.setProperty('--bg', bg);
   style.setProperty('--primary-hi', primaryHi);

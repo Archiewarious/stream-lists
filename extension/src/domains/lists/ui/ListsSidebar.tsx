@@ -1,5 +1,5 @@
 import { Popover } from '@mantine/core';
-import { IconAlertTriangle, IconCloudCheck, IconLoader2, IconPlus, IconX } from '@tabler/icons-react';
+import { IconAlertTriangle, IconCloudCheck, IconLoader2, IconPalette, IconPlus, IconX } from '@tabler/icons-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -10,8 +10,10 @@ import ListForm from '@domains/lists/ui/ListForm';
 
 interface ListsSidebarProps {
   lists: ChannelList[];
-  activeListId: number;
+  /** null while the appearance screen is open. */
+  activeListId: number | null;
   onSelect: (listId: number) => void;
+  onAppearance: () => void;
   onCreate: (title: string, kind: ListKind) => void;
   isSaving: boolean;
   saveError: string | null;
@@ -20,7 +22,7 @@ interface ListsSidebarProps {
 }
 
 const ListsSidebar = (props: ListsSidebarProps) => {
-  const { lists, activeListId, onSelect, onCreate, isSaving, saveError, onDismissError, notice } = props;
+  const { lists, activeListId, onSelect, onAppearance, onCreate, isSaving, saveError, onDismissError, notice } = props;
   const { t } = useTranslation();
   const [isNewListOpened, setIsNewListOpened] = useState(false);
 
@@ -68,7 +70,18 @@ const ListsSidebar = (props: ListsSidebarProps) => {
         </Popover.Dropdown>
       </Popover>
 
-      <div className="mt-auto flex items-start gap-2 px-2.5 pt-3 text-xs text-fg-3">
+      <button
+        type="button"
+        onClick={onAppearance}
+        className={`mt-auto flex items-center gap-2.5 rounded-[14px] p-2.5 text-left text-sm font-bold ${
+          activeListId === null ? 'selected text-fg' : 'text-fg-2 hover:bg-white/5'
+        }`}
+      >
+        <IconPalette size={18} />
+        {t('appearance.title')}
+      </button>
+
+      <div className="flex items-start gap-2 px-2.5 pt-3 text-xs text-fg-3">
         {saveError ? (
           <>
             <IconAlertTriangle size={15} className="shrink-0 text-[var(--accent)]" />

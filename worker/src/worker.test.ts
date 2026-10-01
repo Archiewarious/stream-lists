@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { signJwt, verifyJwt } from './jwt';
 import { buildSnapshot, getByteSize, SNAPSHOT_LIMIT_BYTES, type ChannelList, type ItemRow } from './snapshot';
+import { parseTheme } from './theme';
 import { toTmdbResults } from './tmdb';
 
 const secret = btoa('test-extension-secret-0123456789');
@@ -77,5 +78,16 @@ describe('toTmdbResults', () => {
       { tmdb_id: 94605, title: 'Аркейн', year: 2021, poster_path: null, type: 'tv' },
       { tmdb_id: 2, title: 'Без даты', year: null, poster_path: null, type: 'movie' },
     ]);
+  });
+});
+
+describe('parseTheme', () => {
+  it('accepts a preset or two hex colors, nothing else', () => {
+    expect(parseTheme({ preset: 'mint' })).toEqual({ preset: 'mint' });
+    expect(parseTheme({ primary: '#C650F4', accent: '#ff7ac1' })).toEqual({ primary: '#c650f4', accent: '#ff7ac1' });
+    expect(parseTheme({ preset: 'neon' })).toBeNull();
+    expect(parseTheme({ primary: 'red', accent: '#ff7ac1' })).toBeNull();
+    expect(parseTheme({ primary: '#c650f4', accent: 'url(javascript:1)' })).toBeNull();
+    expect(parseTheme(null)).toBeNull();
   });
 });

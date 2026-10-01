@@ -22,7 +22,7 @@ const UiPage = () => {
 
   const pickPreset = (id: PresetId) => {
     setPreset(id);
-    applyTheme(PRESETS[id]);
+    applyTheme({ preset: id });
   };
 
   return (
