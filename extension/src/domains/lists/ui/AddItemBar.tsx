@@ -9,7 +9,8 @@ import MovieSearchInput from '@domains/movies/ui/MovieSearchInput';
 
 interface AddItemBarProps {
   kind: ListKind;
-  onAdd: (title: string, movie?: MovieFields) => void;
+  /** Returns a message when the title was not added (already in the list). */
+  onAdd: (title: string, movie?: MovieFields) => string | null;
   onBulk: (titles: string[], status: ItemStatus) => Promise<void>;
 }
 
@@ -17,6 +18,7 @@ interface AddItemBarProps {
 const AddItemBar = ({ kind, onAdd, onBulk }: AddItemBarProps) => {
   const { t } = useTranslation();
   const [title, setTitle] = useState('');
+  const [addError, setAddError] = useState<string | null>(null);
   const [isBulkOpened, setIsBulkOpened] = useState(false);
   const [bulkText, setBulkText] = useState('');
   const [isBulkSaving, setIsBulkSaving] = useState(false);
@@ -27,8 +29,13 @@ const AddItemBar = ({ kind, onAdd, onBulk }: AddItemBarProps) => {
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
     if (!title.trim()) return;
-    onAdd(title.trim());
-    setTitle('');
+    add(title.trim());
+  };
+
+  const add = (nextTitle: string, movie?: MovieFields) => {
+    const error = onAdd(nextTitle, movie);
+    setAddError(error);
+    if (!error) setTitle('');
   };
 
   const submitBulk = async (status: ItemStatus) => {
@@ -40,16 +47,17 @@ const AddItemBar = ({ kind, onAdd, onBulk }: AddItemBarProps) => {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="flex gap-2.5">
+    <form onSubmit={handleSubmit} className="flex items-start gap-2.5">
       <MovieSearchInput
         withSuggestions={kind === 'movies'}
         placeholder={t(kind === 'movies' ? 'movies.searchPlaceholder' : 'config.addPlaceholder')}
         value={title}
-        onChange={setTitle}
-        onPick={(pickedTitle, movie) => {
-          onAdd(pickedTitle, movie);
-          setTitle('');
+        onChange={(value) => {
+          setTitle(value);
+          setAddError(null);
         }}
+        onPick={add}
+        error={addError}
       />
       <Button variant="default" size="md" leftSection={<IconList size={18} />} onClick={() => setIsBulkOpened(true)}>
         {t('config.bulk')}

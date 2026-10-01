@@ -70,7 +70,9 @@
     "saving": "Сохраняю…",
     "saveFailed": "Не сохранилось: {{error}}",
     "loadFailed": "Не удалось загрузить списки: {{error}}",
-    "retry": "Повторить"
+    "retry": "Повторить",
+    "duplicateQueue": "Уже в очереди · {{position}}",
+    "duplicateWatched": "Уже есть: {{status}}"
   },
   "movies": {
     "searchPlaceholder": "Найти фильм — постер и год подтянутся сами",

@@ -70,7 +70,9 @@
     "saving": "Saving…",
     "saveFailed": "Not saved: {{error}}",
     "loadFailed": "Couldn't load the lists: {{error}}",
-    "retry": "Retry"
+    "retry": "Retry",
+    "duplicateQueue": "Already in the queue · {{position}}",
+    "duplicateWatched": "Already there: {{status}}"
   },
   "movies": {
     "searchPlaceholder": "Find a movie — poster and year come along",

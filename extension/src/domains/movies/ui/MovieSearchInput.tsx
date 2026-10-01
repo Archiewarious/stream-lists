@@ -19,13 +19,14 @@ interface MovieSearchInputProps {
   value: string;
   onChange: (value: string) => void;
   onPick: (title: string, movie?: MovieFields) => void;
+  error?: string | null;
 }
 
 /**
  * Title input with TMDB suggestions: picking one saves the poster and year. Enter takes the highlighted
  * suggestion; with none highlighted the surrounding form submits the plain title.
  */
-const MovieSearchInput = ({ withSuggestions, placeholder, value, onChange, onPick }: MovieSearchInputProps) => {
+const MovieSearchInput = ({ withSuggestions, placeholder, value, onChange, onPick, error }: MovieSearchInputProps) => {
   const { t, i18n } = useTranslation();
   const combobox = useCombobox({ onDropdownClose: () => combobox.resetSelectedOption() });
   const [debouncedValue] = useDebouncedValue(value.trim(), 300);
@@ -69,6 +70,7 @@ const MovieSearchInput = ({ withSuggestions, placeholder, value, onChange, onPic
           leftSection={withSuggestions ? <IconSearch size={18} /> : <IconPlus size={18} />}
           placeholder={placeholder}
           maxLength={200}
+          error={error}
           value={value}
           onChange={(event) => {
             onChange(event.currentTarget.value);

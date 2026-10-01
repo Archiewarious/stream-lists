@@ -3,10 +3,12 @@ import { IconChartPie, IconDots, IconTrash } from '@tabler/icons-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { normalizeTitle } from '@worker/pointauc';
 import type { ItemRow } from '@worker/snapshot';
+import { formatDay } from '@domains/lists/lib/items';
 import AppearanceView from '@domains/appearance/ui/AppearanceView';
 import PointaucImportModal from '@domains/integrations/pointauc/ui/PointaucImportModal';
-import { useChannel, type ItemStatus, type ListKind } from '@domains/lists/model/useChannel';
+import { useChannel, type ItemStatus, type ListKind, type MovieFields } from '@domains/lists/model/useChannel';
 import AddItemBar from '@domains/lists/ui/AddItemBar';
 import ListForm from '@domains/lists/ui/ListForm';
 import ListsSidebar from '@domains/lists/ui/ListsSidebar';
@@ -17,7 +19,7 @@ import ConfirmPopover from '@shared/ui/ConfirmPopover';
 const NOTICE_MS = 6000;
 
 const ConfigPage = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const channel = useChannel();
   const [activeListId, setActiveListId] = useState<number | null>(null);
   const [isAppearanceOpened, setIsAppearanceOpened] = useState(false);
@@ -67,6 +69,18 @@ const ConfigPage = () => {
   const list = channel.lists.find((candidate) => candidate.id === activeListId) ?? channel.lists[0];
   const queue = list.items.filter((item) => item.status === 'queue');
   const watched = list.items.filter((item) => item.status === 'watched');
+
+  /** Adds to the queue; a title already in the list is not added again — returns where it is instead. */
+  const addItem = (title: string, movie?: MovieFields) => {
+    const existing = list.items.find((item) => normalizeTitle(item.title) === normalizeTitle(title));
+    if (existing?.status === 'queue') return t('config.duplicateQueue', { position: queue.indexOf(existing) + 1 });
+    if (existing) {
+      const date = formatDay(existing.watched_at ?? 0, i18n.language);
+      return t('config.duplicateWatched', { status: t(`columns.${list.kind}.seenChip`, { date }) });
+    }
+    channel.addItem(list.id, title, 'queue', movie);
+    return null;
+  };
 
   const addBulk = async (titles: string[], status: ItemStatus, source: ItemRow['source'] = 'manual') => {
     const result = await channel.addBulk(list.id, titles, status, source);
@@ -118,7 +132,7 @@ const ConfigPage = () => {
 
             <AddItemBar
               kind={list.kind}
-              onAdd={(title, movie) => channel.addItem(list.id, title, 'queue', movie)}
+              onAdd={addItem}
               onBulk={addBulk}
             />
 
