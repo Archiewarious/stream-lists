@@ -40,14 +40,14 @@ panel.html ◄── снимок из Twitch config (мгновенно) ──
 ## Данные (D1)
 
 ```
-channels: channel_id PK, theme (JSON), pointauc_token_enc, created_at
-lists:    id, channel_id, title, kind (movies | games | custom), position, created_at
+lists:    id, channel_id, title, kind (movies | games | custom), created_at
 items:    id, list_id, title, year, poster_path, tmdb_id, status (queue | watched),
           position, added_at, watched_at, source (manual | pointauc)
 ```
 
 Сопоставление с Pointauc и поиск повторов — по нормализованному названию (trim + lowercase).
-Данные фазы 1 из Twitch config импортируются в D1 при первом открытии.
+Таблица `channels` (тема, токен Pointauc) добавится миграцией на этапах 6–7. Данные фазы 1 не переносятся
+(были только тестовые на канале автора).
 
 ## Worker API
 
@@ -55,6 +55,7 @@ items:    id, list_id, title, year, poster_path, tmdb_id, status (queue | watche
 |---|---|---|---|
 | GET | `/api/channel` | стример | все списки и элементы |
 | POST/PATCH/DELETE | `/api/lists[/:id]` | стример | списки |
+| PUT | `/api/lists/:id/order` | стример | порядок очереди (`ids` по порядку) |
 | POST/PATCH/DELETE | `/api/items[/:id]` | стример | элементы, статус, порядок |
 | POST | `/api/items/bulk` | стример | вставка «Списком» |
 | GET | `/api/tmdb/search?q=` | стример | подсказки: название, год, постер |
@@ -64,6 +65,8 @@ items:    id, list_id, title, year, poster_path, tmdb_id, status (queue | watche
 | GET | `/api/public/:channelId/watched?q=&cursor=` | зритель | история и поиск |
 
 Секреты Worker: `EXTENSION_SECRET`, `TMDB_API_KEY`, `TOKEN_ENCRYPTION_KEY`.
+Адрес: `https://stream-lists.begidan32.workers.dev` (Cloudflare-аккаунт begidan32, D1 `stream-lists`).
+CORS `*`: токен идёт в заголовке, не в cookie. Снимок — формат `v: 2` с короткими ключами (`worker/src/snapshot.ts`).
 
 ## Фронтенд
 
@@ -113,4 +116,9 @@ extension/src/
 npm run dev          # extension: http://[::1]:5173/config.html и /panel.html — Twitch имитируется
 npm test             # чистая логика
 npm run build        # dist → zip (tar.exe -a -cf ... -C dist panel.html config.html assets)
+
+# worker/
+npm test             # JWT и снимок
+npm run dev          # wrangler dev; секрет — в .dev.vars; локальные миграции: npx wrangler d1 migrations apply stream-lists --local
+npm run deploy       # миграции на удалённую D1 + выкладка
 ```

@@ -1,0 +1,22 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "stream-lists",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-30",
+  "account_id": "c2445478e316f0101a6ea612040c8fb5",
+  "observability": { "enabled": true },
+  "vars": {
+    // Twitch extension Client ID and the Twitch user who owns the extension (used to sign Helix requests).
+    "CLIENT_ID": "rlbp8y9c7l7hqp9p77r8awnggble5p",
+    "OWNER_ID": "245767379"
+  },
+  // Secret EXTENSION_SECRET: `wrangler secret put EXTENSION_SECRET` (locally — in .dev.vars).
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "stream-lists",
+      "database_id": "9a67d6c2-1acd-4c71-9efc-af7d135d06d7",
+      "migrations_dir": "migrations"
+    }
+  ]
+}
