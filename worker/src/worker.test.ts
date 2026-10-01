@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import { signJwt, verifyJwt } from './jwt';
 import { buildSnapshot, getByteSize, SNAPSHOT_LIMIT_BYTES, type ChannelList, type ItemRow } from './snapshot';
+import { decryptText, encryptText } from './crypto';
+import { matchLots, toPointaucLots } from './pointauc';
 import { parseTheme } from './theme';
 import { toTmdbResults } from './tmdb';
 
@@ -89,5 +91,35 @@ describe('parseTheme', () => {
     expect(parseTheme({ primary: 'red', accent: '#ff7ac1' })).toBeNull();
     expect(parseTheme({ primary: '#c650f4', accent: 'url(javascript:1)' })).toBeNull();
     expect(parseTheme(null)).toBeNull();
+  });
+});
+
+describe('Pointauc', () => {
+  it('reads lots and matches them to the list by title', () => {
+    const lots = toPointaucLots([
+      { fastId: 1, id: 'a', name: ' Матрица ', amount: 540, investors: [] },
+      { fastId: 2, id: 'b', name: 'Терминатор 2', amount: 760 },
+      { fastId: 3, id: 'c', name: 'Бегущий по лезвию 2049', amount: 1250 },
+      { id: 'd', amount: 10 }, // no name — skipped
+    ]);
+    const items = [
+      { title: 'Интерстеллар', status: 'queue' as const, watched_at: null },
+      { title: 'бегущий по лезвию 2049', status: 'queue' as const, watched_at: null },
+      { title: 'Матрица', status: 'watched' as const, watched_at: 1789689600000 },
+    ];
+    expect(matchLots(lots, items)).toEqual([
+      { id: 'c', name: 'Бегущий по лезвию 2049', amount: 1250, status: 'queue', position: 2 },
+      { id: 'b', name: 'Терминатор 2', amount: 760, status: 'new' },
+      { id: 'a', name: 'Матрица', amount: 540, status: 'watched', watched_at: 1789689600000 },
+    ]);
+    expect(toPointaucLots({ error: 'no tab' })).toEqual([]);
+  });
+
+  it('encrypts the token so only the key opens it', async () => {
+    const key = btoa('k'.repeat(32));
+    const stored = await encryptText('pointauc-token', key);
+    expect(stored).not.toContain('pointauc-token');
+    expect(await decryptText(stored, key)).toBe('pointauc-token');
+    await expect(decryptText(stored, btoa('x'.repeat(32)))).rejects.toThrow();
   });
 });

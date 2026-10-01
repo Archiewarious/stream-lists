@@ -113,5 +113,23 @@
         "hint": "deep red"
       }
     }
+  },
+  "pointauc": {
+    "open": "From Pointauc",
+    "title": "Pointauc lots",
+    "subtitle": "Current auction · new ones are preselected",
+    "connectSubtitle": "Connect your auction once — lots will show up here",
+    "step1": "Open pointauc.com and sign in — keep the auction tab open",
+    "step2": "Settings → API → Show Token, copy the token",
+    "step3": "Paste it here",
+    "token": "Pointauc token",
+    "tokenSafety": "The token is stored encrypted on our server and never shown to viewers",
+    "connect": "Connect",
+    "connectFailed": "Pointauc rejected the token. Check it and that the pointauc.com tab is open",
+    "loadFailed": "Pointauc did not answer. Open pointauc.com with your auction and press Refresh",
+    "retry": "Refresh",
+    "disconnect": "Disconnect Pointauc",
+    "empty": "No lots in the auction yet",
+    "noRepeats": "Watched and queued titles are not added twice"
   }
 }

@@ -25,6 +25,7 @@ const updateItem = (lists: ChannelList[], itemId: number, update: (items: ItemRo
 export const useChannel = () => {
   const [lists, setLists] = useState<ChannelList[] | null>(null);
   const [theme, setTheme] = useState<ChannelTheme | null>(null);
+  const [isPointaucConnected, setIsPointaucConnected] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -32,9 +33,13 @@ export const useChannel = () => {
 
   const reload = useCallback(async () => {
     try {
-      const channel = await callWorker<{ lists: ChannelList[]; theme: ChannelTheme | null }>('GET', '/api/channel');
+      const channel = await callWorker<{ lists: ChannelList[]; theme: ChannelTheme | null; pointauc: boolean }>(
+        'GET',
+        '/api/channel',
+      );
       setLists(channel.lists);
       setTheme(channel.theme);
+      setIsPointaucConnected(channel.pointauc);
       applyTheme(channel.theme); // the streamer sees their window in the same colors as viewers
       setLoadError(null);
       if (import.meta.env.DEV) twitchApi.mirrorSnapshot?.(buildSnapshot(channel.lists, channel.theme));
@@ -69,6 +74,7 @@ export const useChannel = () => {
   return {
     lists,
     theme,
+    isPointaucConnected,
     loadError,
     reload,
     isSaving,
@@ -100,10 +106,23 @@ export const useChannel = () => {
     addItem: (listId: number, title: string, status: ItemStatus, movie: MovieFields = {}) =>
       run(() => callWorker<ItemRow>('POST', '/api/items', { list_id: listId, title, status, ...movie })),
 
-    addBulk: (listId: number, titles: string[], status: ItemStatus) =>
+    addBulk: (listId: number, titles: string[], status: ItemStatus, source: ItemRow['source'] = 'manual') =>
       run(() =>
-        callWorker<{ added: ItemRow[]; skipped: number }>('POST', '/api/items/bulk', { list_id: listId, titles, status }),
+        callWorker<{ added: ItemRow[]; skipped: number }>('POST', '/api/items/bulk', {
+          list_id: listId,
+          titles,
+          status,
+          source,
+        }),
       ),
+
+    /** Throws with the Worker's message (bad token, Pointauc tab closed) so the dialog can show it. */
+    connectPointauc: async (token: string) => {
+      await callWorker('PUT', '/api/pointauc/token', { token });
+      setIsPointaucConnected(true);
+    },
+
+    disconnectPointauc: () => run(() => callWorker('DELETE', '/api/pointauc/token')),
 
     setStatus: (itemId: number, status: ItemStatus) =>
       run(

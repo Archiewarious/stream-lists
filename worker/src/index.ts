@@ -1,4 +1,6 @@
+import { decryptText, encryptText } from './crypto';
 import { signJwt, verifyJwt } from './jwt';
+import { matchLots, normalizeTitle, toPointaucLots } from './pointauc';
 import { buildSnapshot, SNAPSHOT_VERSION, type ChannelList, type ItemRow, type ListRow } from './snapshot';
 import { parseTheme, type ChannelTheme } from './theme';
 import { POSTER_PATH, toTmdbResults } from './tmdb';
@@ -9,6 +11,7 @@ interface Env {
   CLIENT_ID: string;
   OWNER_ID: string;
   TMDB_API_KEY?: string;
+  TOKEN_ENCRYPTION_KEY?: string;
 }
 
 const MAX_LISTS = 20;
@@ -81,8 +84,6 @@ const readMovieFields = (body: Record<string, unknown>) => {
   return fields;
 };
 
-const normalizeTitle = (title: string) => title.trim().toLowerCase();
-
 // --- data access (every query is scoped to the channel from the JWT) ---
 
 const loadChannel = async (db: D1Database, channelId: string): Promise<ChannelList[]> => {
@@ -102,9 +103,36 @@ const loadChannel = async (db: D1Database, channelId: string): Promise<ChannelLi
   }));
 };
 
+const loadSettings = (db: D1Database, channelId: string) =>
+  db
+    .prepare('SELECT theme, pointauc_token FROM channels WHERE channel_id = ?')
+    .bind(channelId)
+    .first<{ theme: string | null; pointauc_token: string | null }>();
+
 const loadTheme = async (db: D1Database, channelId: string): Promise<ChannelTheme | null> => {
-  const stored = await db.prepare('SELECT theme FROM channels WHERE channel_id = ?').bind(channelId).first<string | null>('theme');
+  const stored = (await loadSettings(db, channelId))?.theme;
   return stored ? parseTheme(JSON.parse(stored)) : null;
+};
+
+const saveSetting = (db: D1Database, channelId: string, column: 'theme' | 'pointauc_token', value: string | null) =>
+  db
+    .prepare(
+      `INSERT INTO channels (channel_id, ${column}) VALUES (?, ?) ON CONFLICT (channel_id) DO UPDATE SET ${column} = excluded.${column}`,
+    )
+    .bind(channelId, value)
+    .run();
+
+const getEncryptionKey = (env: Env) => {
+  if (!env.TOKEN_ENCRYPTION_KEY) throw new HttpError(503, 'TOKEN_ENCRYPTION_KEY is not configured');
+  return env.TOKEN_ENCRYPTION_KEY;
+};
+
+// Pointauc relays the request to the streamer's open pointauc.com tab; with the tab closed (or a bad token)
+// it answers 500, not 403 — so every failure means "open Pointauc / check the token".
+const fetchPointaucLots = async (token: string) => {
+  const response = await fetch('https://pointauc.com/api/oshino/lots', { headers: { Authorization: `Bearer ${token}` } });
+  if (!response.ok) throw new HttpError(502, `Pointauc ${response.status}`);
+  return toPointaucLots(await response.json());
 };
 
 const getOwnedList = async (db: D1Database, channelId: string, listId: number) => {
@@ -197,17 +225,45 @@ const handleApi = async (request: Request, env: Env, channelId: string, route: s
   const now = Date.now();
 
   switch (route) {
-    case 'GET /api/channel':
-      return { lists: await loadChannel(db, channelId), theme: await loadTheme(db, channelId) };
+    case 'GET /api/channel': {
+      const settings = await loadSettings(db, channelId);
+      return {
+        lists: await loadChannel(db, channelId),
+        theme: settings?.theme ? parseTheme(JSON.parse(settings.theme)) : null,
+        pointauc: !!settings?.pointauc_token,
+      };
+    }
 
     case 'PUT /api/theme': {
       const theme = parseTheme(await readBody(request));
       if (!theme) throw new HttpError(400, 'Expected { preset } or { primary, accent } as #rrggbb');
-      await db
-        .prepare('INSERT INTO channels (channel_id, theme) VALUES (?, ?) ON CONFLICT (channel_id) DO UPDATE SET theme = excluded.theme')
-        .bind(channelId, JSON.stringify(theme))
-        .run();
+      await saveSetting(db, channelId, 'theme', JSON.stringify(theme));
       return theme;
+    }
+
+    case 'PUT /api/pointauc/token': {
+      // Checked against Pointauc before saving, so a typo shows up right away (needs the Pointauc tab open).
+      const { token } = await readBody(request);
+      if (typeof token !== 'string' || !/^\S{10,2000}$/.test(token.trim())) throw new HttpError(400, 'Invalid token');
+      await fetchPointaucLots(token.trim());
+      await saveSetting(db, channelId, 'pointauc_token', await encryptText(token.trim(), getEncryptionKey(env)));
+      return { ok: true };
+    }
+
+    case 'DELETE /api/pointauc/token':
+      await saveSetting(db, channelId, 'pointauc_token', null);
+      return { ok: true };
+
+    case 'GET /api/pointauc/lots': {
+      const list = await getOwnedList(db, channelId, Number(new URL(request.url).searchParams.get('list_id')));
+      const stored = (await loadSettings(db, channelId))?.pointauc_token;
+      if (!stored) throw new HttpError(409, 'Pointauc is not connected');
+      const lots = await fetchPointaucLots(await decryptText(stored, getEncryptionKey(env)));
+      const items = await db
+        .prepare(`SELECT title, status, watched_at FROM items WHERE list_id = ? ORDER BY position, id`)
+        .bind(list.id)
+        .all<Pick<ItemRow, 'title' | 'status' | 'watched_at'>>();
+      return matchLots(lots, items.results);
     }
 
     case 'GET /api/tmdb/search': {
@@ -284,6 +340,7 @@ const handleApi = async (request: Request, env: Env, channelId: string, route: s
       const body = await readBody(request);
       const list = await getOwnedList(db, channelId, Number(body.list_id));
       const status = body.status === undefined ? 'queue' : readEnum<ItemRow['status']>(body.status, ITEM_STATUSES, 'status');
+      const source = body.source === 'pointauc' ? 'pointauc' : 'manual';
       if (!Array.isArray(body.titles) || body.titles.length > MAX_BULK_ITEMS) {
         throw new HttpError(400, `titles must be an array of at most ${MAX_BULK_ITEMS}`);
       }
@@ -302,11 +359,11 @@ const handleApi = async (request: Request, env: Env, channelId: string, route: s
 
       const basePosition = (await db.prepare(`SELECT ${NEXT_QUEUE_POSITION} AS next`).bind(list.id).first<number>('next')) ?? 1;
       const insert = db.prepare(
-        'INSERT INTO items (list_id, title, status, position, added_at, watched_at) VALUES (?, ?, ?, ?, ?, ?) RETURNING *',
+        'INSERT INTO items (list_id, title, status, position, added_at, watched_at, source) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING *',
       );
       const results = await db.batch<ItemRow>(
         titles.map((title, index) =>
-          insert.bind(list.id, title, status, basePosition + index, now, status === 'watched' ? now : null),
+          insert.bind(list.id, title, status, basePosition + index, now, status === 'watched' ? now : null, source),
         ),
       );
       return { added: results.map((result) => result.results[0]), skipped: body.titles.length - titles.length };

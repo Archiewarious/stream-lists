@@ -1,9 +1,11 @@
 import { ActionIcon, Button, Center, Loader, Modal, Text, Title } from '@mantine/core';
-import { IconDots, IconTrash } from '@tabler/icons-react';
+import { IconChartPie, IconDots, IconTrash } from '@tabler/icons-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import type { ItemRow } from '@worker/snapshot';
 import AppearanceView from '@domains/appearance/ui/AppearanceView';
+import PointaucImportModal from '@domains/integrations/pointauc/ui/PointaucImportModal';
 import { useChannel, type ItemStatus, type ListKind } from '@domains/lists/model/useChannel';
 import AddItemBar from '@domains/lists/ui/AddItemBar';
 import ListForm from '@domains/lists/ui/ListForm';
@@ -20,6 +22,7 @@ const ConfigPage = () => {
   const [activeListId, setActiveListId] = useState<number | null>(null);
   const [isAppearanceOpened, setIsAppearanceOpened] = useState(false);
   const [isSettingsOpened, setIsSettingsOpened] = useState(false);
+  const [isPointaucOpened, setIsPointaucOpened] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
   const selectList = (listId: number) => {
@@ -65,8 +68,8 @@ const ConfigPage = () => {
   const queue = list.items.filter((item) => item.status === 'queue');
   const watched = list.items.filter((item) => item.status === 'watched');
 
-  const addBulk = async (titles: string[], status: ItemStatus) => {
-    const result = await channel.addBulk(list.id, titles, status);
+  const addBulk = async (titles: string[], status: ItemStatus, source: ItemRow['source'] = 'manual') => {
+    const result = await channel.addBulk(list.id, titles, status, source);
     if (!result) return;
     setNotice(t('config.bulkResult', { added: result.added.length, skipped: result.skipped }));
     setTimeout(() => setNotice(null), NOTICE_MS);
@@ -100,6 +103,9 @@ const ConfigPage = () => {
               <Title order={1} size={48} className="min-w-0 flex-1 truncate !leading-[1.25]">
                 {list.title}
               </Title>
+              <Button variant="default" leftSection={<IconChartPie size={16} />} onClick={() => setIsPointaucOpened(true)}>
+                {t('pointauc.open')}
+              </Button>
               <ActionIcon
                 variant="default"
                 size="lg"
@@ -134,6 +140,17 @@ const ConfigPage = () => {
           </>
         )}
       </main>
+
+      <PointaucImportModal
+        opened={isPointaucOpened}
+        onClose={() => setIsPointaucOpened(false)}
+        listId={list.id}
+        kind={list.kind}
+        isConnected={channel.isPointaucConnected}
+        onConnect={channel.connectPointauc}
+        onDisconnect={channel.disconnectPointauc}
+        onImport={(titles, status) => addBulk(titles, status, 'pointauc')}
+      />
 
       <Modal
         opened={isSettingsOpened}
