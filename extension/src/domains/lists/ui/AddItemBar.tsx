@@ -11,7 +11,8 @@ interface AddItemBarProps {
   kind: ListKind;
   /** Returns a message when the title was not added (already in the list). */
   onAdd: (title: string, movie?: MovieFields) => string | null;
-  onBulk: (titles: string[], status: ItemStatus) => Promise<void>;
+  /** Resolves false when saving failed — the pasted text stays. */
+  onBulk: (titles: string[], status: ItemStatus) => Promise<boolean>;
 }
 
 /** One title → queue; "Списком" pastes many at once (to the queue or straight to watched). */
@@ -40,8 +41,9 @@ const AddItemBar = ({ kind, onAdd, onBulk }: AddItemBarProps) => {
 
   const submitBulk = async (status: ItemStatus) => {
     setIsBulkSaving(true);
-    await onBulk(bulkTitles, status);
+    const isSaved = await onBulk(bulkTitles, status);
     setIsBulkSaving(false);
+    if (!isSaved) return;
     setIsBulkOpened(false);
     setBulkText('');
   };

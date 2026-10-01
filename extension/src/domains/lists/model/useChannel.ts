@@ -30,13 +30,18 @@ export const useChannel = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const pending = useRef(0);
+  const reloadSeq = useRef(0);
 
   const reload = useCallback(async () => {
+    const seq = ++reloadSeq.current;
     try {
       const channel = await callWorker<{ lists: ChannelList[]; theme: ChannelTheme | null; pointauc: boolean }>(
         'GET',
         '/api/channel',
       );
+      // A newer reload is coming, or an edit started meanwhile (its own reload follows): this answer is stale
+      // and would roll back the newer optimistic state.
+      if (seq !== reloadSeq.current || pending.current) return;
       setLists(channel.lists);
       setTheme(channel.theme);
       setIsPointaucConnected(channel.pointauc);
@@ -66,7 +71,7 @@ export const useChannel = () => {
       pending.current -= 1;
       if (!pending.current) {
         await reload(); // also rolls back an optimistic edit that failed
-        setIsSaving(false);
+        if (!pending.current) setIsSaving(false);
       }
     }
   };

@@ -84,9 +84,10 @@ const ConfigPage = () => {
 
   const addBulk = async (titles: string[], status: ItemStatus, source: ItemRow['source'] = 'manual') => {
     const result = await channel.addBulk(list.id, titles, status, source);
-    if (!result) return;
+    if (!result) return false;
     setNotice(t('config.bulkResult', { added: result.added.length, skipped: result.skipped }));
     setTimeout(() => setNotice(null), NOTICE_MS);
+    return true;
   };
 
   return (

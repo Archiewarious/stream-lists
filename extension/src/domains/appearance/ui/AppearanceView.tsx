@@ -28,9 +28,10 @@ const AppearanceView = ({ theme, list, onPreview, onSave }: AppearanceViewProps)
   const current = theme ?? DEFAULT_THEME;
   const custom = 'preset' in current ? DEFAULT_CUSTOM : current;
   // A color picker fires on every drag step: repaint each time, save once it settles.
-  const saveLater = useDebouncedCallback(onSave, SAVE_DELAY_MS);
+  const saveLater = useDebouncedCallback(onSave, { delay: SAVE_DELAY_MS, flushOnUnmount: true });
 
   const pick = (nextTheme: ChannelTheme) => {
+    saveLater.cancel(); // a pending color must not overwrite the preset picked after it
     onPreview(nextTheme);
     onSave(nextTheme);
   };

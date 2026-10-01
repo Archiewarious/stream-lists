@@ -1,12 +1,13 @@
 import type { ItemRow } from '@worker/snapshot';
 
 export const MAX_BULK_ITEMS = 200;
+const MAX_TITLE_LENGTH = 200; // the Worker rejects the whole batch over a longer one
 
 /** "Списком": one title per line, blank lines dropped, numbering like "1. " or "- " stripped. */
 export const parseBulkTitles = (text: string) =>
   text
     .split('\n')
-    .map((line) => line.replace(/^\s*(\d+[.)]|[-*•])\s+/, '').trim())
+    .map((line) => line.replace(/^\s*(\d+[.)]|[-*•])\s+/, '').trim().slice(0, MAX_TITLE_LENGTH))
     .filter(Boolean);
 
 export interface MonthGroup<T> {

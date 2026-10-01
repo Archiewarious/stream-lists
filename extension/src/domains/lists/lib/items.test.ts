@@ -4,6 +4,7 @@ import { groupByMonth, parseBulkTitles } from './items';
 
 describe('parseBulkTitles', () => {
   it('drops blank lines and list markers', () => {
+    expect(parseBulkTitles('x'.repeat(300))).toEqual(['x'.repeat(200)]); // the Worker caps titles at 200
     expect(parseBulkTitles('1. Матрица\n\n  - Троя  \n• Чужой\n2) Титаник\nБегущий по лезвию 2049')).toEqual([
       'Матрица',
       'Троя',

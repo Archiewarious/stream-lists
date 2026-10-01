@@ -50,7 +50,8 @@ const readBody = async (request: Request): Promise<Record<string, unknown>> => {
 };
 
 const readTitle = (value: unknown, maxLength: number) => {
-  const title = typeof value === 'string' ? value.trim() : '';
+  // Control characters are dropped: JSON escapes each as 6 bytes and could push the snapshot past 5 KB.
+  const title = typeof value === 'string' ? value.replace(/\p{Cc}/gu, '').trim() : '';
   if (!title || title.length > maxLength) throw new HttpError(400, `Title must be 1–${maxLength} characters`);
   return title;
 };
