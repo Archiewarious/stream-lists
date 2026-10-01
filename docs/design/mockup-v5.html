@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<title>Stream Lists — макет v5 (палитра канала)</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800&family=Great+Vibes&family=Marck+Script&display=swap&subset=cyrillic" rel="stylesheet" />
+<link href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.34.1/dist/tabler-icons.min.css" rel="stylesheet" />
+<style>
+:root {
+  --text: #ffffff; --text-2: rgba(255, 255, 255, 0.68); --text-3: rgba(255, 255, 255, 0.44);
+  --glass: linear-gradient(160deg, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.045) 55%, rgba(255, 255, 255, 0.07));
+  --glass-edge: rgba(255, 255, 255, 0.16);
+  --glass-shine: inset 0 1px 0 rgba(255, 255, 255, 0.28), inset 0 -1px 0 rgba(255, 255, 255, 0.05);
+  --tally: #ffbf5e; --act: #9b5cff; --ok: #6ee7a8;
+  --display: 'Unbounded', system-ui, sans-serif; --body: 'Inter', system-ui, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #1c1a22; font-family: var(--body); padding: 40px; display: flex; flex-direction: column; gap: 44px; align-items: flex-start; }
+.caption { font: 500 13px var(--body); color: #c9c4d3; margin-bottom: 10px; }
+.frame { position: relative; overflow: hidden; background: #0b0a10; color: var(--text); border-radius: 8px; isolation: isolate; }
+.ambient { position: absolute; inset: -30%; z-index: -1; background-size: cover; background-position: center; filter: blur(70px) saturate(1.25) brightness(0.48); }
+.frame::after { content: ''; position: absolute; inset: 0; z-index: -1; background: linear-gradient(rgba(11, 10, 16, 0.28), rgba(11, 10, 16, 0.28)), radial-gradient(120% 90% at 50% 0%, transparent 25%, rgba(8, 7, 12, 0.7) 100%); }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+.ti { font-size: 18px; line-height: 1; }
+.glass { background: var(--glass); backdrop-filter: blur(26px) saturate(170%); -webkit-backdrop-filter: blur(26px) saturate(170%); border: 1px solid var(--glass-edge); box-shadow: var(--glass-shine), 0 12px 32px rgba(0, 0, 0, 0.28); }
+.glass-soft { background: rgba(255, 255, 255, 0.07); backdrop-filter: blur(18px); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12); }
+.poster { flex-shrink: 0; border-radius: 6px; background: rgba(255,255,255,.08) center/cover; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12), 0 4px 12px rgba(0, 0, 0, 0.35); }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--tally); box-shadow: 0 0 0 3px rgba(255, 191, 94, 0.22), 0 0 12px var(--tally); flex-shrink: 0; }
+.btn { display: inline-flex; align-items: center; gap: 7px; font: 600 13px var(--body); padding: 9px 15px; border-radius: 999px; white-space: nowrap; }
+.btn .ti { font-size: 16px; }
+.btn.go { background: linear-gradient(180deg, #ad7bff, #8a40ff); color: #fff; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 6px 18px rgba(138, 64, 255, 0.45); }
+.btn.sm { font-size: 12px; padding: 6px 11px; }
+.chip { font: 500 11px var(--body); padding: 4px 9px; border-radius: 999px; white-space: nowrap; }
+.chip.seen { color: var(--ok); background: rgba(110, 231, 168, 0.13); box-shadow: inset 0 0 0 1px rgba(110, 231, 168, 0.25); }
+.chip.queue { color: var(--text-2); background: rgba(255, 255, 255, 0.08); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12); }
+.chip.new { color: #d4b8ff; background: rgba(155, 92, 255, 0.2); box-shadow: inset 0 0 0 1px rgba(155, 92, 255, 0.4); }
+.label { font: 600 11px var(--body); letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-3); }
+.year { color: var(--text-3); font: 400 12px var(--body); font-variant-numeric: tabular-nums; }
+.num { color: var(--text-3); font: 500 11px var(--body); font-variant-numeric: tabular-nums; width: 14px; text-align: right; flex-shrink: 0; }
+
+/* panel */
+.panel { width: 318px; height: 500px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.p-top { display: flex; align-items: center; gap: 8px; }
+.p-switch { display: flex; align-items: center; gap: 6px; font: 700 15px var(--display); padding-left: 4px; }
+.p-switch .ti { font-size: 14px; color: var(--text-2); }
+.p-search { margin-left: auto; width: 160px; display: flex; align-items: center; gap: 7px; height: 32px; padding: 0 12px; border-radius: 999px; font: 400 12px var(--body); color: var(--text-3); }
+.p-search .ti { font-size: 14px; }
+.p-search.active { color: var(--text); box-shadow: inset 0 1px 0 rgba(255,255,255,.2), 0 0 0 2px rgba(155, 92, 255, 0.55); }
+.p-now { display: flex; align-items: center; gap: 12px; padding: 10px; border-radius: 18px; }
+.p-now .tag { font: 600 11px var(--display); color: var(--tally); display: flex; align-items: center; gap: 7px; margin-bottom: 5px; }
+.p-now .title { font: 600 15px/1.25 var(--body); }
+.p-now .meta { font: 400 12px var(--body); color: var(--text-2); margin-top: 3px; }
+.seg { position: relative; display: grid; grid-template-columns: 1fr 1fr; border-radius: 999px; padding: 3px; }
+.seg span { position: relative; z-index: 1; text-align: center; font: 500 12px var(--body); color: var(--text-2); padding: 7px 0; border-radius: 999px; }
+.seg span.on { color: var(--text); background: rgba(255, 255, 255, 0.16); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 2px 8px rgba(0, 0, 0, 0.25); }
+.seg b { font-weight: 500; color: var(--text-3); margin-left: 4px; }
+.p-list { flex: 1; overflow: hidden; border-radius: 18px; padding: 6px; }
+.p-row { display: flex; align-items: center; gap: 10px; height: 46px; padding: 0 6px; border-radius: 12px; font: 500 13px var(--body); }
+.p-row .t { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.p-row .date { font: 400 11px var(--body); color: var(--text-3); }
+.p-row.dim .poster { opacity: 0.72; }
+.p-month { display: flex; justify-content: space-between; padding: 8px 8px 4px; }
+.res { display: flex; flex-direction: column; gap: 8px; }
+.res-row { display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: 16px; font: 500 13px var(--body); }
+.res-row .info { flex: 1; min-width: 0; }
+.res-row .info .year { display: block; margin-top: 2px; }
+.res-row mark { background: none; color: #c9a8ff; font-weight: 600; }
+.p-hint { font: 400 12px var(--body); color: var(--text-2); padding: 2px 6px; }
+
+/* config */
+.config { width: 1000px; height: 700px; display: grid; grid-template-columns: 210px 1fr; grid-template-rows: minmax(0, 1fr); gap: 14px; padding: 14px; }
+.side { border-radius: 22px; padding: 18px 12px; display: flex; flex-direction: column; }
+.brand { font: 700 15px var(--display); display: flex; align-items: center; gap: 9px; padding: 0 8px 22px; }
+.side .label { padding: 0 8px 8px; }
+.nav { display: flex; align-items: center; gap: 10px; padding: 10px; border-radius: 14px; color: var(--text-2); font: 500 14px var(--body); }
+.nav span { flex: 1; } .nav b { font: 500 12px var(--body); color: var(--text-3); }
+.nav.on { color: var(--text); background: rgba(255, 255, 255, 0.14); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25); }
+.new-list { margin: 8px 10px 0; display: flex; align-items: center; gap: 8px; font: 500 14px var(--body); color: #c9a8ff; padding: 8px 0; }
+.side-foot { margin-top: auto; padding: 0 10px; font: 400 12px var(--body); color: var(--text-3); display: flex; gap: 8px; align-items: center; }
+.main { display: flex; flex-direction: column; gap: 12px; min-width: 0; min-height: 0; }
+.head { display: flex; align-items: center; justify-content: space-between; padding: 4px 4px 0; }
+.head h1 { font: 700 26px var(--display); }
+.hero { display: flex; align-items: center; gap: 18px; padding: 14px; border-radius: 22px; }
+.hero .info { flex: 1; min-width: 0; }
+.hero .tag { font: 600 12px var(--display); color: var(--tally); display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.hero .title { font: 700 22px/1.2 var(--display); }
+.hero .meta { font: 400 13px var(--body); color: var(--text-2); margin-top: 6px; }
+.hero .acts { display: flex; flex-direction: column; gap: 8px; }
+.add { display: flex; gap: 10px; }
+.input { flex: 1; display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 16px; border-radius: 999px; font: 400 14px var(--body); color: var(--text-3); }
+.cols { flex: 1; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: minmax(0, 1fr); gap: 12px; min-height: 0; }
+.col { border-radius: 22px; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+.col-head { display: flex; align-items: center; gap: 8px; padding: 14px 16px 8px; }
+.col-head .count { font: 500 12px var(--body); color: var(--text-3); }
+.col-head .search { margin-left: auto; display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 11px; border-radius: 999px; font: 400 12px var(--body); color: var(--text-3); width: 140px; }
+.col-head .search .ti { font-size: 14px; }
+.list { overflow: hidden; padding: 0 8px 8px; flex: 1; }
+.row { display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 8px; border-radius: 12px; font: 500 13px var(--body); }
+.row .t { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row.hover { background: rgba(255, 255, 255, 0.1); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15); }
+.row .acts { display: none; gap: 4px; } .row.hover .acts { display: flex; }
+.row .grip { color: var(--text-3); font-size: 14px; opacity: 0; } .row.hover .grip { opacity: 1; }
+.row .date { font: 400 12px var(--body); color: var(--text-3); }
+.row.dim .poster { opacity: 0.7; }
+.month { display: flex; justify-content: space-between; padding: 10px 8px 4px; }
+
+/* search dropdown */
+.find { width: 600px; padding: 26px; }
+.find .input { color: var(--text); box-shadow: var(--glass-shine), 0 0 0 2px rgba(155, 92, 255, 0.6); }
+.drop { margin-top: 10px; border-radius: 22px; padding: 8px; }
+.opt { display: flex; align-items: center; gap: 12px; padding: 8px; border-radius: 14px; font: 500 14px var(--body); }
+.opt .info { flex: 1; } .opt .info .year { display: block; margin-top: 3px; }
+.opt.on { background: rgba(255, 255, 255, 0.12); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2); }
+.opt kbd { font: 500 11px var(--body); color: var(--text-3); border: 1px solid rgba(255,255,255,.18); border-radius: 6px; padding: 3px 7px; }
+.opt.plain { color: var(--text-2); }
+.opt.plain .ti { width: 36px; text-align: center; color: var(--text-3); }
+.tmdb { font: 400 11px var(--body); color: var(--text-3); padding: 8px 10px 2px; }
+
+/* import */
+.import { width: 1000px; height: 620px; display: grid; place-items: center; }
+.dialog { width: 620px; border-radius: 26px; padding: 6px 6px 0; }
+.dlg-head { display: flex; align-items: flex-start; padding: 16px 18px 6px; }
+.dlg-head h2 { font: 700 19px var(--display); } .dlg-head p { font: 400 13px var(--body); color: var(--text-2); margin-top: 5px; }
+.lot { display: flex; align-items: center; gap: 12px; padding: 7px 12px; border-radius: 14px; font: 500 14px var(--body); }
+.lot .t { flex: 1; } .lot.muted { color: var(--text-3); } .lot.muted .poster { opacity: 0.55; }
+.lot .amount { font: 500 12px var(--body); color: var(--text-2); width: 56px; text-align: right; font-variant-numeric: tabular-nums; }
+.check { width: 20px; height: 20px; border-radius: 7px; border: 1.5px solid rgba(255, 255, 255, 0.35); display: grid; place-items: center; flex-shrink: 0; }
+.check.on { background: linear-gradient(180deg, #ad7bff, #8a40ff); border-color: transparent; box-shadow: inset 0 1px 0 rgba(255,255,255,.35); }
+.check.on .ti { font-size: 13px; color: #fff; }
+.dlg-foot { display: flex; align-items: center; gap: 12px; padding: 14px 18px; margin-top: 6px; border-top: 1px solid rgba(255, 255, 255, 0.1); }
+.dlg-foot .grow { flex: 1; font: 400 12px var(--body); color: var(--text-2); }
+
+/* v5 — palette from the channel panels */
+:root {
+  --text: #fff7ff; --text-2: rgba(255, 240, 255, 0.72); --text-3: rgba(255, 232, 255, 0.48);
+  --glass: linear-gradient(160deg, rgba(236, 196, 255, 0.17), rgba(192, 120, 255, 0.07) 55%, rgba(255, 150, 220, 0.09));
+  --glass-edge: rgba(242, 208, 255, 0.26);
+  --glass-shine: inset 0 1px 0 rgba(255, 238, 255, 0.45), inset 0 -1px 0 rgba(255, 255, 255, 0.06);
+  --display: 'Great Vibes', 'Marck Script', cursive; --body: 'Nunito', system-ui, sans-serif;
+}
+.frame { background: #140b1f; }
+.ambient.aurora { inset: 0; filter: none; background:
+  radial-gradient(70% 50% at 10% 0%, rgba(178, 70, 242, 0.55), transparent 70%),
+  radial-gradient(55% 45% at 105% 35%, rgba(255, 95, 170, 0.34), transparent 70%),
+  radial-gradient(45% 35% at 75% 105%, rgba(255, 160, 70, 0.2), transparent 70%), #140b1f; }
+.frame::after { background: radial-gradient(130% 100% at 50% 0%, transparent 45%, rgba(12, 6, 20, 0.55) 100%); }
+.btn.go { background: linear-gradient(180deg, #f290ff 0%, #c650f4 48%, #9a2fe0 100%); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), inset 0 -3px 8px rgba(80, 0, 130, 0.35), 0 6px 20px rgba(198, 80, 244, 0.5); }
+.btn.go::after { content: '✦'; font-size: 10px; margin-left: 2px; opacity: 0.9; }
+.check.on { background: linear-gradient(180deg, #f290ff, #9a2fe0); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55); }
+.chip.seen { color: #ff9bd0; background: rgba(255, 122, 193, 0.16); box-shadow: inset 0 0 0 1px rgba(255, 122, 193, 0.38); }
+.chip.new { color: #ffc56b; background: rgba(255, 177, 74, 0.15); box-shadow: inset 0 0 0 1px rgba(255, 177, 74, 0.38); }
+.chip.queue { color: #e3c8ff; background: rgba(214, 170, 255, 0.12); box-shadow: inset 0 0 0 1px rgba(214, 170, 255, 0.26); }
+.res-row mark { color: #f3a6ff; }
+.label { font: 800 11px var(--body); letter-spacing: 0.08em; }
+.p-switch { font: 400 30px/1 var(--display); padding-left: 2px; text-shadow: 0 0 14px rgba(230, 140, 255, 0.55); }
+.head h1 { font: 400 48px/1 var(--display); text-shadow: 0 0 18px rgba(230, 140, 255, 0.5); }
+.brand { font: 400 28px/1 var(--display); text-shadow: 0 0 14px rgba(230, 140, 255, 0.5); }
+.brand .dot { display: none; }
+.dlg-head h2 { font: 400 36px/1 var(--display); text-shadow: 0 0 14px rgba(230, 140, 255, 0.5); }
+.seg span.on, .nav.on, .row.hover, .opt.on { background: rgba(242, 196, 255, 0.2); box-shadow: inset 0 1px 0 rgba(255, 238, 255, 0.4), 0 2px 10px rgba(150, 40, 220, 0.25); }
+.new-list { color: #f0a8ff; }
+.p-search.active, .find .input { box-shadow: inset 0 1px 0 rgba(255, 238, 255, 0.35), 0 0 0 2px rgba(242, 144, 255, 0.65), 0 0 18px rgba(242, 144, 255, 0.35); }
+.p-row, .row, .res-row, .opt, .lot, .nav { font-weight: 700; }
+.year, .date, .p-row .date, .row .date { font-weight: 600; }
+.poster { box-shadow: 0 0 0 1px rgba(255, 220, 255, 0.2), 0 4px 12px rgba(40, 0, 70, 0.45); }
+
+.theme { width: 1000px; padding: 26px; display: grid; grid-template-columns: 1fr 318px; gap: 26px; }
+.theme h2 { font: 400 40px/1 var(--display); text-shadow: 0 0 14px rgba(230, 140, 255, 0.5); margin-bottom: 6px; }
+.theme .sub { font: 600 13px var(--body); color: var(--text-2); margin-bottom: 18px; }
+.swatches { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.sw { border-radius: 18px; padding: 12px; display: flex; align-items: center; gap: 12px; font: 700 14px var(--body); }
+.sw .orb { width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0; box-shadow: inset 0 2px 3px rgba(255, 255, 255, 0.55), inset 0 -4px 8px rgba(0, 0, 0, 0.25), 0 4px 14px rgba(0, 0, 0, 0.35); }
+.sw small { display: block; font: 600 11px var(--body); color: var(--text-3); margin-top: 2px; }
+.sw.on { box-shadow: var(--glass-shine), 0 0 0 2px rgba(242, 144, 255, 0.8), 0 0 22px rgba(242, 144, 255, 0.35); }
+.custom { margin-top: 14px; border-radius: 18px; padding: 14px; display: flex; align-items: center; gap: 14px; font: 700 14px var(--body); }
+.custom .pick { display: flex; align-items: center; gap: 8px; padding: 6px 12px 6px 6px; border-radius: 999px; font: 700 12px var(--body); color: var(--text-2); }
+.custom .pick i { width: 24px; height: 24px; border-radius: 50%; display: block; box-shadow: inset 0 1px 2px rgba(255,255,255,.5); }
+.preview-cap { font: 800 11px var(--body); letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); margin-bottom: 8px; }
+.mini { height: 300px; border-radius: 18px; padding: 10px; position: relative; overflow: hidden; isolation: isolate; display: flex; flex-direction: column; gap: 8px; }
+</style>
+</head>
+<body>
+
+<div style="display: flex; gap: 36px">
+  <div><div class="caption">1. Панель зрителя — очередь</div><div class="frame panel" id="panel-queue"></div></div>
+  <div><div class="caption">2. Просмотрено — по месяцам</div><div class="frame panel" id="panel-watched"></div></div>
+  <div><div class="caption">3. Поиск: «а это уже смотрели?»</div><div class="frame panel" id="panel-search"></div></div>
+</div>
+
+<div><div class="caption">4. Окно стримера — фильмы, 73 позиции</div><div class="frame config" id="config"></div></div>
+
+
+<div><div class="caption">5. Оформление — стример подбирает цвета под свой канал</div><div class="frame theme" id="theme"></div></div>
+<div style="display: flex; gap: 36px">
+  <div><div class="caption">6. Добавление — постер и год подтягиваются сами</div><div class="frame find" id="find"></div></div>
+</div>
+
+<div><div class="caption">7. Лоты из рулетки Pointauc — с постерами и проверкой повторов</div><div class="frame import" id="import"></div></div>
+
+<script>
+const P = (path, size = 'w92') => `https://image.tmdb.org/t/p/${size}/${path}.jpg`;
+const poster = (path, w, h) => `<div class="poster" style="width:${w}px;height:${h}px;background-image:url(${P(path)})"></div>`;
+const ambient = () => `<div class="ambient aurora"></div>`;
+const NOW = { t: 'Дюна: Часть вторая', y: 2024, p: '3aLghRkuJc9cs770fxo4a6YWht3' };
+const QUEUE = [
+  ['Интерстеллар', 2014, 'vReLRjDV9XPhiOSEW7QWow4DXwf'], ['Аркейн', 2021, 'kVioUjk1SXGWblJNaKsIJcBqUcY'],
+  ['Бегущий по лезвию 2049', 2017, 'fnIJeT9GZvscKm5PbmAvhTYDsLh'], ['Начало', 2010, 'piQXcdOGgv1O9HQ07pI0tnjkGJw'],
+  ['Остров проклятых', 2010, '3UVMyefkUBiktshtKIEnNXvOFKH'], ['Престиж', 2006, 'cynfEpFBHGkdBIVpdnx8Od2TQNj'],
+  ['Матрица: Перезагрузка', 2003, 'd0xVNNxIYxId2qHkqpgE39soOvD'], ['Зелёная миля', 1999, 'lHxe8t4B0CKv4DO0C0B4rsuiG95'],
+  ['Отступники', 2006, 'jT6JJV6t902SN9dJlSRdiPi6hSv'], ['Джентльмены', 2020, 'vWxVVECgYDPSg5o0Rhw5u7KFa7X'],
+];
+const WATCHED = [
+  ['Сентябрь', 9, [['Чужой', '28 сент', 'zg4fcO8IuYRllK9wWVNqNlYpueL'], ['Титаник', '25 сент', 'r3sYKBtoNHPyS9vkaA8dJyh8grG'], ['Троя', '21 сент', 'bUd8lcSzYjruaQR9nNAQbTg99LV'], ['Матрица', '18 сент', 'kEDbym5htJgDQNenjUtSJxAHysB'], ['Бойцовский клуб', '14 сент', '66RvLrRJTm4J8l3uHXWF09AICol'], ['Леон', '11 сент', 'yyjNn3Ly7ChAT2V9yOlx8QyFs82']]],
+  ['Август', 14, [['Гладиатор', '30 авг', '1wjNqlfsuHNTXTpCt2ZOV2iPxaf'], ['Тёмный рыцарь', '27 авг', 'aPtN76OjnNKLqCJ2FJBnQOIL031'], ['Пианист', '22 авг', 'eih8OFL5Kc4nrGU821jxU5rWINx']]],
+];
+const panelTop = (search = '<i class="ti ti-search"></i>Найти фильм', active = '') =>
+  `<div class="p-top"><div class="p-switch">Фильмы<i class="ti ti-chevron-down"></i></div><div class="p-search glass-soft ${active}">${search}</div></div>`;
+const nowCard = `<div class="p-now glass">${poster(NOW.p, 40, 60)}<div><div class="tag"><span class="dot"></span>Смотрим сейчас</div><div class="title">${NOW.t}</div><div class="meta">${NOW.y} · выпал на колесе</div></div></div>`;
+const seg = (on) => `<div class="seg glass-soft"><span class="${on === 'q' ? 'on' : ''}">Очередь<b>18</b></span><span class="${on === 'w' ? 'on' : ''}">Просмотрено<b>54</b></span></div>`;
+
+document.getElementById('panel-queue').innerHTML = ambient(QUEUE[0][2]) + panelTop() + seg('q') +
+  `<div class="p-list glass-soft">${QUEUE.map(([t, y, p], i) => `<div class="p-row"><span class="num">${i + 1}</span>${poster(p, 24, 36)}<span class="t">${t}</span><span class="year">${y}</span></div>`).join('')}</div>`;
+
+document.getElementById('panel-watched').innerHTML = ambient(WATCHED[0][2][0][2]) + panelTop() + seg('w') +
+  `<div class="p-list glass-soft">${WATCHED.map(([m, n, items]) => `<div class="p-month"><span class="label">${m}</span><span class="label">${n}</span></div>` +
+    items.map(([t, d, p]) => `<div class="p-row dim">${poster(p, 24, 36)}<span class="t">${t}</span><span class="date">${d}</span></div>`).join('')).join('')}</div>`;
+
+document.getElementById('panel-search').innerHTML = ambient('kEDbym5htJgDQNenjUtSJxAHysB') +
+  panelTop('<i class="ti ti-search"></i>мат<i class="ti ti-x" style="margin-left:auto"></i>', 'active') +
+  `<div class="p-hint">Нашлось 2 из 73</div><div class="res">` +
+  `<div class="res-row glass">${poster('kEDbym5htJgDQNenjUtSJxAHysB', 34, 51)}<div class="info"><mark>Мат</mark>рица<span class="year">1999</span></div><span class="chip seen">Смотрели 18 сент</span></div>` +
+  `<div class="res-row glass">${poster('d0xVNNxIYxId2qHkqpgE39soOvD', 34, 51)}<div class="info"><mark>Мат</mark>рица: Перезагрузка<span class="year">2003</span></div><span class="chip queue">В очереди · 7</span></div></div>`;
+
+document.getElementById('config').innerHTML = ambient(QUEUE[0][2]) +
+  `<aside class="side glass"><div class="brand"><span class="dot"></span>Stream Lists</div><div class="label">Ваши списки</div>
+    <a class="nav on"><i class="ti ti-movie"></i><span>Фильмы</span><b>73</b></a><a class="nav"><i class="ti ti-device-gamepad-2"></i><span>Игры</span><b>9</b></a><a class="nav"><i class="ti ti-list-details"></i><span>Челленджи</span><b>3</b></a>
+    <button class="new-list"><i class="ti ti-plus"></i>Новый список</button><div class="side-foot"><i class="ti ti-cloud-check" style="font-size:15px"></i>Сохранено</div></aside>
+  <main class="main">
+    <div class="head"><h1>Фильмы</h1><div style="display:flex;gap:8px"><button class="btn glass-soft"><i class="ti ti-chart-pie"></i>Из Pointauc</button><button class="btn glass-soft" aria-label="Ещё" style="padding:9px 11px"><i class="ti ti-dots"></i></button></div></div>
+    <div class="add"><div class="input glass-soft"><i class="ti ti-search"></i>Найти фильм — постер и год подтянутся сами</div><button class="btn glass-soft"><i class="ti ti-list"></i>Списком</button></div>
+    <div class="cols">
+      <section class="col glass"><div class="col-head"><span class="label">Очередь</span><span class="count">18</span></div><div class="list">${QUEUE.slice(0, 10).map(([t, y, p], i) =>
+        `<div class="row${i === 1 ? ' hover' : ''}"><i class="ti ti-grip-vertical grip"></i><span class="num">${i + 1}</span>${poster(p, 22, 33)}<span class="t">${t}</span>${i === 1 ? '<span class="acts"><button class="btn go sm"><i class="ti ti-check"></i>Просмотрено</button></span>' : `<span class="year">${y}</span>`}</div>`).join('')}</div></section>
+      <section class="col glass"><div class="col-head"><span class="label">Просмотрено</span><span class="count">54</span><div class="search glass-soft"><i class="ti ti-search"></i>Найти</div></div><div class="list">${WATCHED.map(([m, n, items]) =>
+        `<div class="month"><span class="label">${m} 2026</span><span class="label">${n}</span></div>` + items.slice(0, m === 'Сентябрь' ? 6 : 3).map(([t, d, p]) => `<div class="row dim">${poster(p, 22, 33)}<span class="t">${t}</span><span class="date">${d}</span></div>`).join('')).join('')}</div></section>
+    </div>
+  </main>`;
+
+document.getElementById('find').innerHTML = ambient('3hbXNclcHaj5KiF6kK41GBMjyFr') +
+  `<div class="input glass-soft"><i class="ti ti-search"></i>дюна<span style="margin-left:auto;font-size:12px;color:var(--text-3)">Enter — выбрать</span></div>
+  <div class="drop glass">
+    <div class="opt on">${poster('3aLghRkuJc9cs770fxo4a6YWht3', 34, 51)}<div class="info">Дюна: Часть вторая<span class="year">2024 · фильм</span></div><kbd>Enter</kbd></div>
+    <div class="opt">${poster('3hbXNclcHaj5KiF6kK41GBMjyFr', 34, 51)}<div class="info">Дюна<span class="year">2021 · фильм</span></div></div>
+    <div class="opt">${poster('ushxXCt5RAXtBFGrpMxiz5n6d3L', 34, 51)}<div class="info">Дюна<span class="year">1984 · фильм</span></div></div>
+    <div class="opt plain"><i class="ti ti-plus"></i><div class="info">Добавить «дюна» без постера</div></div>
+    <div class="tmdb">Постеры и годы — из базы TMDB</div>
+  </div>`;
+
+const LOTS = [
+  ['Бегущий по лезвию 2049', '1 250', 'queue', 'В очереди · 3', false, 'fnIJeT9GZvscKm5PbmAvhTYDsLh'],
+  ['Список Шиндлера', '980', 'new', 'Новый', true, 'dB7edCQIuExWErWXFVqR7ORnZRS'],
+  ['Терминатор 2', '760', 'new', 'Новый', true, '67MopMcqqke4sJmcOwY5zu3kmYz'],
+  ['Матрица', '540', 'seen', 'Смотрели 18 сент', false, 'kEDbym5htJgDQNenjUtSJxAHysB'],
+  ['Безумный Макс: Дорога ярости', '410', 'new', 'Новый', true, '8FM6AhLMX3X6OcZjfmH24F4rKMI'],
+  ['Время приключений', '300', 'new', 'Новый', true, 'wq2n0OLK4dL1eZBORliFMvIR6qf'],
+  ['Титаник', '150', 'seen', 'Смотрели 25 сент', false, 'r3sYKBtoNHPyS9vkaA8dJyh8grG'],
+];
+document.getElementById('import').innerHTML = ambient('67MopMcqqke4sJmcOwY5zu3kmYz') +
+  `<div class="dialog glass"><div class="dlg-head"><div style="flex:1"><h2>Лоты из Pointauc</h2><p>Текущий аукцион · новые уже отмечены</p></div><button class="btn glass-soft" aria-label="Закрыть" style="padding:8px"><i class="ti ti-x"></i></button></div>
+  ${LOTS.map(([t, a, k, s, on, p]) => `<div class="lot${k !== 'new' ? ' muted' : ''}"><span class="check${on ? ' on' : ''}">${on ? '<i class="ti ti-check"></i>' : ''}</span>${poster(p, 26, 39)}<span class="t">${t}</span><span class="chip ${k}">${s}</span><span class="amount">${a}</span></div>`).join('')}
+  <div class="dlg-foot"><div class="grow">Просмотренные и стоящие в очереди не добавятся повторно</div><button class="btn glass-soft"><i class="ti ti-check"></i>Сразу в просмотренные</button><button class="btn go"><i class="ti ti-plus"></i>В очередь · 4</button></div></div>`;
+
+const THEMES = [
+  ["Лиловая лисичка", "по умолчанию", "linear-gradient(180deg,#f290ff,#9a2fe0)", true],
+  ["Twitch", "классический фиолетовый", "linear-gradient(180deg,#b98cff,#772ce8)"],
+  ["Закат", "коралл и персик", "linear-gradient(180deg,#ffc27a,#ff5f7e)"],
+  ["Мята", "свежий бирюзовый", "linear-gradient(180deg,#8ff5d6,#1aa889)"],
+  ["Лёд", "голубой неон", "linear-gradient(180deg,#b4e1ff,#4a86ff)"],
+  ["Вишня", "глубокий красный", "linear-gradient(180deg,#ff8aa8,#c4123f)"],
+];
+document.getElementById("theme").innerHTML = ambient() +
+  `<div><h2>Оформление</h2><div class="sub">Зрители увидят панель в цветах, которые вы выберете</div>
+  <div class="swatches">${THEMES.map(([n, s, g, on]) => `<div class="sw glass${on ? " on" : ""}"><span class="orb" style="background:${g}"></span><div>${n}<small>${s}</small></div></div>`).join("")}</div>
+  <div class="custom glass"><span style="flex:1">Свои цвета</span><span class="pick glass-soft"><i style="background:#c650f4"></i>Основной</span><span class="pick glass-soft"><i style="background:#ff7ac1"></i>Акцент</span></div></div>
+  <div><div class="preview-cap">Так увидят зрители</div><div class="mini glass">${ambient()}${panelTop()}${seg("q")}<div class="p-list glass-soft">${QUEUE.slice(0, 4).map(([t, y, p], i) => `<div class="p-row"><span class="num">${i + 1}</span>${poster(p, 24, 36)}<span class="t">${t}</span><span class="year">${y}</span></div>`).join("")}</div></div></div>`;
+</script>
+</body>
+</html>

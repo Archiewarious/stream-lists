@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<title>Stream Lists — макет</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Unbounded:wght@500;600;700&display=swap&subset=cyrillic" rel="stylesheet" />
+<link href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.34.1/dist/tabler-icons.min.css" rel="stylesheet" />
+<style>
+:root {
+  --bg: #111014; --shelf: #1b1921; --shelf-2: #24212c; --rim: #2c2934;
+  --chalk: #f3f0f8; --fog: #a19cad; --dim: #6e6879;
+  --tally: #ffb547; --tally-wash: rgba(255, 181, 71, 0.09);
+  --act: #9147ff; --act-ink: #ffffff; --act-wash: rgba(145, 71, 255, 0.14);
+  --display: 'Unbounded', system-ui, sans-serif; --body: 'Inter', system-ui, sans-serif;
+}
+.light {
+  --bg: #f7f6fa; --shelf: #ffffff; --shelf-2: #efedf4; --rim: #e2dfe9;
+  --chalk: #18151f; --fog: #5f596b; --dim: #9a94a6;
+  --tally: #b86a00; --tally-wash: rgba(184, 106, 0, 0.08);
+  --act: #772ce8; --act-wash: rgba(119, 44, 232, 0.1);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #2a2730; font-family: var(--body); padding: 40px; display: flex; flex-direction: column; gap: 40px; align-items: flex-start; }
+.caption { font: 500 13px var(--body); color: #c9c4d3; margin-bottom: 10px; }
+.frame { background: var(--bg); color: var(--chalk); overflow: hidden; position: relative; border-radius: 6px; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+.ti { font-size: 18px; line-height: 1; }
+
+/* covers */
+.cover { flex-shrink: 0; border-radius: 4px; overflow: hidden; background: var(--shelf-2); position: relative; }
+.cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.cover.type { padding: 6px; display: flex; flex-direction: column; justify-content: space-between; color: rgba(255,255,255,0.92); }
+.cover.type b { font: 700 9px/1.15 var(--display); letter-spacing: -0.01em; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+.cover.type .ti { font-size: 12px; opacity: 0.7; }
+.c-oxblood { background: #5b1e2c; } .c-teal { background: #134650; } .c-indigo { background: #2b2763; }
+.c-olive { background: #3c4a1d; } .c-rust { background: #6b3413; } .c-plum { background: #4b1d50; }
+
+/* ---------- config ---------- */
+.config { width: 1000px; height: 700px; display: grid; grid-template-columns: 232px 1fr; }
+.side { background: var(--shelf); border-right: 1px solid var(--rim); padding: 20px 14px; display: flex; flex-direction: column; }
+.brand { font: 700 15px var(--display); display: flex; align-items: center; gap: 9px; padding: 0 8px 22px; }
+.brand .mark { width: 10px; height: 10px; border-radius: 50%; background: var(--tally); box-shadow: 0 0 0 4px var(--tally-wash); }
+.side-label { font: 600 11px var(--body); color: var(--dim); letter-spacing: 0.06em; text-transform: uppercase; padding: 0 8px 8px; }
+.nav { display: flex; align-items: center; gap: 10px; padding: 9px 8px; border-radius: 6px; color: var(--fog); font: 500 14px var(--body); }
+.nav span { flex: 1; }
+.nav b { font: 500 12px var(--body); color: var(--dim); font-variant-numeric: tabular-nums; }
+.nav.on { background: var(--shelf-2); color: var(--chalk); }
+.nav.on .ti { color: var(--act); }
+.nav .live { width: 6px; height: 6px; border-radius: 50%; background: var(--tally); }
+.new-list { margin: 12px 8px 0; display: flex; align-items: center; gap: 8px; font: 500 14px var(--body); color: var(--act); padding: 8px 0; }
+.side-foot { margin-top: auto; padding: 0 8px; }
+.storage { display: flex; justify-content: space-between; font: 400 12px var(--body); color: var(--dim); margin-bottom: 7px; }
+.bar { height: 4px; border-radius: 2px; background: var(--shelf-2); }
+.bar i { display: block; height: 100%; border-radius: 2px; background: var(--fog); }
+
+.main { padding: 22px 26px 18px; display: flex; flex-direction: column; min-width: 0; }
+.list-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.list-head .title { display: flex; align-items: center; gap: 12px; }
+.list-head h1 { font: 700 24px var(--display); letter-spacing: -0.01em; }
+.list-head .title > .ti { font-size: 24px; color: var(--act); }
+.ghost { display: inline-flex; align-items: center; gap: 7px; font: 500 13px var(--body); color: var(--fog); padding: 7px 11px; border-radius: 6px; border: 1px solid var(--rim); }
+.icon-btn { width: 32px; height: 32px; border-radius: 6px; display: inline-grid; place-items: center; color: var(--fog); }
+.add { display: flex; align-items: center; gap: 10px; height: 46px; padding: 0 8px 0 14px; border-radius: 8px; background: var(--shelf); border: 1px solid var(--rim); margin-bottom: 20px; }
+.add .ti { color: var(--dim); }
+.add span { flex: 1; font: 400 14px var(--body); color: var(--dim); }
+.add kbd { font: 500 11px var(--body); color: var(--dim); border: 1px solid var(--rim); border-radius: 4px; padding: 3px 6px; }
+
+.board { flex: 1; display: grid; grid-template-columns: 1.25fr 1fr 1fr; gap: 14px; min-height: 0; }
+.col { background: var(--shelf); border: 1px solid var(--rim); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 6px; min-height: 0; }
+.col h2 { font: 600 12px var(--body); letter-spacing: 0.04em; text-transform: uppercase; color: var(--fog); display: flex; align-items: center; gap: 8px; padding: 2px 4px 8px; }
+.col h2 em { font-style: normal; color: var(--dim); font-variant-numeric: tabular-nums; }
+.col.now { border-color: color-mix(in srgb, var(--tally) 45%, var(--rim)); background: linear-gradient(var(--tally-wash), var(--tally-wash)), var(--shelf); }
+.col.now h2 { color: var(--tally); font: 600 12px var(--display); letter-spacing: 0.02em; text-transform: none; }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--tally); box-shadow: 0 0 0 3px var(--tally-wash); }
+
+.card { display: flex; align-items: center; gap: 10px; padding: 6px; border-radius: 6px; position: relative; }
+.card .num { width: 16px; text-align: right; font: 500 12px var(--body); color: var(--dim); font-variant-numeric: tabular-nums; }
+.card .name { flex: 1; min-width: 0; font: 500 14px/1.3 var(--body); }
+.card .grip { position: absolute; left: -3px; color: var(--dim); font-size: 14px; opacity: 0; }
+.card.hover { background: var(--shelf-2); }
+.card.hover .grip { opacity: 1; }
+.card .acts { display: none; gap: 4px; }
+.card.hover .acts { display: flex; }
+.pill-btn { display: inline-flex; align-items: center; gap: 5px; font: 600 12px var(--body); padding: 5px 9px; border-radius: 5px; }
+.pill-btn.go { background: var(--act); color: var(--act-ink); }
+.pill-btn.go .ti, .pill-btn .ti { font-size: 14px; }
+.more { font: 500 12px var(--body); color: var(--dim); padding: 6px 8px 0; }
+
+.now-card { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 12px; padding: 10px 6px 4px; }
+.now-card .cover { box-shadow: 0 0 0 2px var(--tally); }
+.now-card .name { font: 600 16px/1.3 var(--body); }
+.now-card .row { display: flex; gap: 6px; }
+.stack { display: flex; flex-direction: column; align-items: stretch; gap: 4px; width: 100%; padding: 0 8px; }
+.pill-btn.wide { justify-content: center; padding: 8px 9px; }
+.pill-btn.link { justify-content: center; color: var(--fog); font-weight: 500; }
+.cover.type.mono { align-items: center; justify-content: center; padding: 0; }
+.cover.type.mono b { font: 700 11px var(--display); letter-spacing: 0.02em; }
+.shelf .cover.type.mono b { font-size: 13px; }
+.pill-btn.line { border: 1px solid var(--rim); color: var(--fog); }
+.drop-hint { margin-top: 14px; border: 1px dashed color-mix(in srgb, var(--tally) 35%, transparent); border-radius: 6px; padding: 10px; text-align: center; font: 400 12px var(--body); color: var(--fog); }
+
+.col.done .card .name { color: var(--fog); }
+.col.done .cover img { filter: grayscale(0.55) brightness(0.85); }
+.col.done .ok { color: var(--dim); font-size: 16px; }
+.hint { font: 400 12px var(--body); color: var(--dim); padding-top: 10px; display: flex; gap: 6px; align-items: center; }
+
+/* ---------- search ---------- */
+.search { width: 560px; padding: 22px 26px; }
+.search .add { margin: 0; border-color: var(--act); box-shadow: 0 0 0 3px var(--act-wash); }
+.search .add span { color: var(--chalk); }
+.drop { margin-top: 8px; background: var(--shelf); border: 1px solid var(--rim); border-radius: 8px; padding: 6px; }
+.opt { display: flex; align-items: center; gap: 12px; padding: 7px 8px; border-radius: 6px; font: 500 14px var(--body); }
+.opt small { display: block; font: 400 12px var(--body); color: var(--dim); }
+.opt.on { background: var(--shelf-2); }
+.opt .grow { flex: 1; }
+.opt kbd { font: 500 11px var(--body); color: var(--dim); border: 1px solid var(--rim); border-radius: 4px; padding: 3px 6px; }
+.opt.plain { color: var(--fog); }
+.opt.plain .ti { width: 30px; text-align: center; color: var(--dim); }
+
+/* ---------- panel ---------- */
+.panel { width: 318px; height: 500px; padding: 12px 14px; display: flex; flex-direction: column; gap: 14px; }
+.pills { display: flex; gap: 6px; }
+.pill { display: inline-flex; align-items: center; gap: 6px; font: 500 12px var(--body); color: var(--fog); padding: 6px 10px; border-radius: 999px; border: 1px solid var(--rim); white-space: nowrap; }
+.pill.on { background: var(--chalk); color: var(--bg); border-color: var(--chalk); }
+.pill .ti { font-size: 14px; }
+.p-label { font: 600 11px var(--body); letter-spacing: 0.05em; text-transform: uppercase; color: var(--fog); display: flex; justify-content: space-between; margin-bottom: 8px; }
+.p-label em { font-style: normal; color: var(--dim); }
+.p-now-label { font: 600 12px var(--display); color: var(--tally); display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.p-now { display: flex; gap: 12px; align-items: center; padding: 10px; border-radius: 8px; background: var(--tally-wash); border: 1px solid color-mix(in srgb, var(--tally) 35%, transparent); }
+.p-now .cover { box-shadow: 0 0 0 2px var(--tally); }
+.p-now .name { font: 600 15px/1.3 var(--body); }
+.p-now small { display: block; font: 400 12px var(--body); color: var(--fog); margin-top: 4px; }
+.p-row { display: flex; align-items: center; gap: 10px; padding: 4px 0; font: 500 13px var(--body); }
+.p-row .num { width: 12px; color: var(--dim); font-variant-numeric: tabular-nums; text-align: right; font-size: 12px; }
+.p-more { font: 500 12px var(--body); color: var(--act); padding-top: 4px; }
+.shelf { display: flex; gap: 6px; }
+.shelf .cover { position: relative; }
+.shelf .cover img { filter: grayscale(0.4) brightness(0.9); }
+.shelf .badge { position: absolute; right: 2px; bottom: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--bg); display: grid; place-items: center; }
+.shelf .badge .ti { font-size: 10px; color: var(--chalk); }
+.shelf .rest { width: 38px; height: 51px; border-radius: 4px; border: 1px dashed var(--rim); display: grid; place-items: center; font: 600 12px var(--body); color: var(--fog); }
+
+/* ---------- onboarding ---------- */
+.onboard { width: 1000px; height: 560px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 40px; }
+.onboard h1 { font: 700 30px var(--display); letter-spacing: -0.015em; margin-bottom: 12px; }
+.onboard p.lead { font: 400 15px/1.6 var(--body); color: var(--fog); max-width: 520px; margin-bottom: 32px; }
+.tiles { display: grid; grid-template-columns: repeat(3, 260px); gap: 16px; }
+.tile { text-align: left; background: var(--shelf); border: 1px solid var(--rim); border-radius: 10px; padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+.tile.hover { border-color: var(--act); box-shadow: 0 0 0 3px var(--act-wash); }
+.tile .ic { width: 44px; height: 44px; border-radius: 10px; background: var(--act-wash); color: var(--act); display: grid; place-items: center; }
+.tile .ic .ti { font-size: 22px; }
+.tile h3 { font: 600 17px var(--display); }
+.tile p { font: 400 13px/1.5 var(--body); color: var(--fog); }
+.tile .cta { margin-top: auto; font: 600 13px var(--body); color: var(--act); display: flex; align-items: center; gap: 6px; }
+.onboard .foot { margin-top: 24px; font: 400 13px var(--body); color: var(--dim); }
+</style>
+</head>
+<body>
+
+<div>
+  <div class="caption">1. Настройки стримера — доска списка (окно Twitch, 1000×700)</div>
+  <div class="frame config">
+    <aside class="side">
+      <div class="brand"><span class="mark"></span>Stream Lists</div>
+      <div class="side-label">Ваши списки</div>
+      <a class="nav on"><i class="ti ti-device-gamepad-2"></i><span>Игры</span><b>9</b></a>
+      <a class="nav"><i class="ti ti-movie"></i><span>Фильмы и сериалы</span><b>4</b></a>
+      <a class="nav"><i class="ti ti-list-details"></i><span>Челленджи</span><b>3</b></a>
+      <button class="new-list"><i class="ti ti-plus"></i>Новый список</button>
+      <div class="side-foot">
+        <div class="storage"><span>Место в Twitch</span><span>1,2 из 5 КБ</span></div>
+        <div class="bar"><i style="width: 24%"></i></div>
+      </div>
+    </aside>
+    <main class="main">
+      <div class="list-head">
+        <div class="title"><i class="ti ti-device-gamepad-2"></i><h1>Игры</h1><button class="icon-btn" aria-label="Переименовать"><i class="ti ti-pencil"></i></button></div>
+        <div style="display: flex; gap: 8px"><button class="ghost"><i class="ti ti-eye"></i>Как видят зрители</button><button class="icon-btn" aria-label="Ещё"><i class="ti ti-dots"></i></button></div>
+      </div>
+      <div class="add"><i class="ti ti-search"></i><span>Добавить игру — обложку найдём в каталоге Twitch</span><kbd>Enter</kbd></div>
+      <div class="board">
+        <section class="col">
+          <h2>Далее <em>5</em></h2>
+          <div class="card hover"><i class="ti ti-grip-vertical grip"></i><span class="num">1</span><div class="cover" style="width: 30px; height: 40px"><img src="https://static-cdn.jtvnw.net/ttv-boxart/512953-144x192.jpg" alt="" /></div><span class="name">Elden Ring</span><span class="acts"><button class="pill-btn go"><i class="ti ti-player-play"></i>Начать</button></span></div>
+          <div class="card"><span class="num">2</span><div class="cover type mono c-oxblood" style="width: 30px; height: 40px"><b>HI</b></div><span class="name">Hades II</span></div>
+          <div class="card"><span class="num">3</span><div class="cover type mono c-teal" style="width: 30px; height: 40px"><b>BG</b></div><span class="name">Baldur's Gate 3</span></div>
+          <div class="card"><span class="num">4</span><div class="cover" style="width: 30px; height: 40px"><img src="https://static-cdn.jtvnw.net/ttv-boxart/27471-144x192.jpg" alt="" /></div><span class="name">Minecraft</span></div>
+          <div class="card"><span class="num">5</span><div class="cover type mono c-indigo" style="width: 30px; height: 40px"><b>SH</b></div><span class="name">Silent Hill f</span></div>
+        </section>
+        <section class="col now">
+          <h2><span class="dot"></span>Сейчас играем</h2>
+          <div class="now-card">
+            <div class="cover" style="width: 108px; height: 144px"><img src="https://static-cdn.jtvnw.net/ttv-boxart/115977-144x192.jpg" alt="" /></div>
+            <div class="name">The Witcher 3: Wild Hunt</div>
+            <div class="stack"><button class="pill-btn go wide"><i class="ti ti-check"></i>Пройдено</button><button class="pill-btn link"><i class="ti ti-arrow-back-up"></i>Вернуть в очередь</button></div>
+          </div>
+          <div class="drop-hint">Перетащите сюда то, что идёт на стриме</div>
+        </section>
+        <section class="col done">
+          <h2>Пройдено <em>12</em></h2>
+          <div class="card"><div class="cover" style="width: 30px; height: 40px"><img src="https://static-cdn.jtvnw.net/ttv-boxart/490147-144x192.jpg" alt="" /></div><span class="name">Hollow Knight</span><i class="ti ti-circle-check ok"></i></div>
+          <div class="card"><div class="cover type mono c-plum" style="width: 30px; height: 40px"><b>DE</b></div><span class="name">Disco Elysium</span><i class="ti ti-circle-check ok"></i></div>
+          <div class="card"><div class="cover type mono c-olive" style="width: 30px; height: 40px"><b>OW</b></div><span class="name">Outer Wilds</span><i class="ti ti-circle-check ok"></i></div>
+          <div class="card"><div class="cover type mono c-rust" style="width: 30px; height: 40px"><b>CE</b></div><span class="name">Celeste</span><i class="ti ti-circle-check ok"></i></div>
+          <div class="more">Показать все 12</div>
+        </section>
+      </div>
+      <div class="hint"><i class="ti ti-hand-move" style="font-size: 14px"></i>Перетаскивайте карточки между колонками или наведите на карточку — появятся кнопки</div>
+    </main>
+  </div>
+</div>
+
+<div>
+  <div class="caption">2. Добавление — поиск по каталогу Twitch</div>
+  <div class="frame search">
+    <div class="add"><i class="ti ti-search"></i><span>minec</span><kbd>Enter</kbd></div>
+    <div class="drop">
+      <div class="opt on"><div class="cover" style="width: 30px; height: 40px"><img src="https://static-cdn.jtvnw.net/ttv-boxart/27471-144x192.jpg" alt="" /></div><div class="grow">Minecraft<small>Игра · каталог Twitch</small></div><kbd>Enter</kbd></div>
+      <div class="opt"><div class="cover type c-teal" style="width: 30px; height: 40px"></div><div class="grow">Minecraft Dungeons<small>Игра · каталог Twitch</small></div></div>
+      <div class="opt plain"><i class="ti ti-plus"></i><div class="grow">Добавить «minec» без обложки</div></div>
+    </div>
+  </div>
+</div>
+
+<div style="display: flex; gap: 40px">
+  <div>
+    <div class="caption">3. Панель зрителя — тёмная тема Twitch (318×500)</div>
+    <div class="frame panel">
+      <div class="pills"><span class="pill on"><i class="ti ti-device-gamepad-2"></i>Игры</span><span class="pill"><i class="ti ti-movie"></i>Фильмы</span><span class="pill"><i class="ti ti-list-details"></i>Челленджи</span></div>
+      <div>
+        <div class="p-now-label"><span class="dot"></span>Сейчас играем</div>
+        <div class="p-now">
+          <div class="cover" style="width: 60px; height: 80px"><img src="https://static-cdn.jtvnw.net/ttv-boxart/115977-144x192.jpg" alt="" /></div>
+          <div><div class="name">The Witcher 3: Wild Hunt</div><small>Следующая — Elden Ring</small></div>
+        </div>
+      </div>
+      <div>
+        <div class="p-label">Далее <em>5</em></div>
+        <div class="p-row"><span class="num">1</span><div class="cover" style="width: 24px; height: 32px"><img src="https://static-cdn.jtvnw.net/ttv-boxart/512953-144x192.jpg" alt="" /></div>Elden Ring</div>
+        <div class="p-row"><span class="num">2</span><div class="cover type mono c-oxblood" style="width: 24px; height: 32px"><b>HI</b></div>Hades II</div>
+        <div class="p-row"><span class="num">3</span><div class="cover type mono c-teal" style="width: 24px; height: 32px"><b>BG</b></div>Baldur's Gate 3</div>
+        <div class="p-more">Ещё 2</div>
+      </div>
+      <div>
+        <div class="p-label">Пройдено <em>12</em></div>
+        <div class="shelf">
+          <div class="cover" style="width: 38px; height: 51px"><img src="https://static-cdn.jtvnw.net/ttv-boxart/490147-144x192.jpg" alt="" /></div>
+          <div class="cover type mono c-plum" style="width: 38px; height: 51px" title="Disco Elysium"><b>DE</b></div>
+          <div class="cover type mono c-olive" style="width: 38px; height: 51px" title="Outer Wilds"><b>OW</b></div>
+          <div class="cover type mono c-rust" style="width: 38px; height: 51px" title="Celeste"><b>CE</b></div>
+          <div class="cover type mono c-indigo" style="width: 38px; height: 51px" title="Inside"><b>IN</b></div>
+          <div class="rest">+7</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div>
+    <div class="caption">4. Та же панель — светлая тема Twitch</div>
+    <div class="frame panel light">
+      <div class="pills"><span class="pill"><i class="ti ti-device-gamepad-2"></i>Игры</span><span class="pill on"><i class="ti ti-movie"></i>Фильмы</span><span class="pill"><i class="ti ti-list-details"></i>Челленджи</span></div>
+      <div>
+        <div class="p-now-label"><span class="dot"></span>Смотрим сейчас</div>
+        <div class="p-now">
+          <div class="cover type c-indigo" style="width: 60px; height: 80px"><b>Дюна: Часть вторая</b><i class="ti ti-movie"></i></div>
+          <div><div class="name">Дюна: Часть вторая</div><small>Следующий — Интерстеллар</small></div>
+        </div>
+      </div>
+      <div>
+        <div class="p-label">Далее <em>2</em></div>
+        <div class="p-row"><span class="num">1</span><div class="cover type mono c-teal" style="width: 24px; height: 32px"><b>ИН</b></div>Интерстеллар</div>
+        <div class="p-row"><span class="num">2</span><div class="cover type mono c-rust" style="width: 24px; height: 32px"><b>А2</b></div>Аркейн, 2 сезон</div>
+      </div>
+      <div>
+        <div class="p-label">Просмотрено <em>3</em></div>
+        <div class="shelf">
+          <div class="cover type mono c-oxblood" style="width: 38px; height: 51px" title="Чужой"><b>ЧУ</b></div>
+          <div class="cover type mono c-olive" style="width: 38px; height: 51px" title="Титаник"><b>ТИ</b></div>
+          <div class="cover type mono c-plum" style="width: 38px; height: 51px" title="Троя"><b>ТР</b></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div>
+  <div class="caption">5. Первый запуск — стример сразу понимает, что делать</div>
+  <div class="frame onboard">
+    <h1>Что ведём на стриме?</h1>
+    <p class="lead">Создайте список — он появится в панели под вашим стримом. Зрители увидят, что идёт сейчас, что дальше и что уже пройдено.</p>
+    <div class="tiles">
+      <div class="tile hover"><div class="ic"><i class="ti ti-device-gamepad-2"></i></div><h3>Игры</h3><p>Что проходите на стриме. Обложки подтянутся из каталога Twitch.</p><div class="cta">Создать список <i class="ti ti-arrow-right" style="font-size: 14px"></i></div></div>
+      <div class="tile"><div class="ic"><i class="ti ti-movie"></i></div><h3>Фильмы и сериалы</h3><p>Что смотрите вместе с чатом.</p><div class="cta">Создать список <i class="ti ti-arrow-right" style="font-size: 14px"></i></div></div>
+      <div class="tile"><div class="ic"><i class="ti ti-list-details"></i></div><h3>Свой список</h3><p>Челленджи, заказы, наказания с колеса — что угодно.</p><div class="cta">Создать список <i class="ti ti-arrow-right" style="font-size: 14px"></i></div></div>
+    </div>
+    <div class="foot">Списков может быть несколько — остальные добавите в любой момент.</div>
+  </div>
+</div>
+
+</body>
+</html>

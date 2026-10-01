@@ -6,6 +6,20 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["--prefix", "extension", "run", "dev"],
       "port": 5173
+    },
+    {
+      "name": "extension-twitch",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "extension", "run", "dev:twitch"],
+      "port": 8080,
+      "url": "https://localhost:8080"
+    },
+    {
+      "name": "mockup",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["extension/node_modules/vite/bin/vite.js", "C:/Users/Alex/AppData/Local/Temp/claude/C--Users-Alex-Desktop-twitch/56d9a1e0-7458-4258-90c6-4afe818bbe7b/scratchpad/mockup", "--port", "8090", "--host", "127.0.0.1"],
+      "port": 8090,
+      "url": "http://127.0.0.1:8090"
     }
   ]
 }
