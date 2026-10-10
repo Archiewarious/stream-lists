@@ -19,9 +19,9 @@ export interface ImportLot extends PointaucLot {
 
 export const normalizeTitle = (title: string) => title.trim().toLowerCase();
 
-/** GET /api/oshino/lots answers [{ fastId, id, name, amount, investors }]; anything malformed is skipped. */
+/** GET /api/oshino/lots answers { lots: [{ fastId, id, name, amount, investors }] }; anything malformed is skipped. */
 export const toPointaucLots = (data: unknown): PointaucLot[] =>
-  (Array.isArray(data) ? data : [])
+  (Array.isArray((data as { lots?: unknown })?.lots) ? (data as { lots: any[] }).lots : [])
     .map((raw) => ({
       id: String(raw?.id ?? raw?.fastId ?? ''),
       name: typeof raw?.name === 'string' ? raw.name.trim().slice(0, 200) : '',

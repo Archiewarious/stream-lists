@@ -96,12 +96,15 @@ describe('parseTheme', () => {
 
 describe('Pointauc', () => {
   it('reads lots and matches them to the list by title', () => {
-    const lots = toPointaucLots([
-      { fastId: 1, id: 'a', name: ' Матрица ', amount: 540, investors: [] },
-      { fastId: 2, id: 'b', name: 'Терминатор 2', amount: 760 },
-      { fastId: 3, id: 'c', name: 'Бегущий по лезвию 2049', amount: 1250 },
-      { id: 'd', amount: 10 }, // no name — skipped
-    ]);
+    const lots = toPointaucLots({
+      lots: [
+        { fastId: 1, id: 'a', name: ' Матрица ', amount: 540, investors: [] },
+        { fastId: 2, id: 'b', name: 'Терминатор 2', amount: 760 },
+        { fastId: 3, id: 'c', name: 'Бегущий по лезвию 2049', amount: 1250 },
+        { id: 'd', amount: 10 }, // no name — skipped
+        { fastId: 4, id: 'e', name: 'Без ставок', amount: null }, // a lot nobody bid on yet
+      ],
+    });
     const items = [
       { title: 'Интерстеллар', status: 'queue' as const, watched_at: null },
       { title: 'бегущий по лезвию 2049', status: 'queue' as const, watched_at: null },
@@ -111,8 +114,10 @@ describe('Pointauc', () => {
       { id: 'c', name: 'Бегущий по лезвию 2049', amount: 1250, status: 'queue', position: 2 },
       { id: 'b', name: 'Терминатор 2', amount: 760, status: 'new' },
       { id: 'a', name: 'Матрица', amount: 540, status: 'watched', watched_at: 1789689600000 },
+      { id: 'e', name: 'Без ставок', amount: 0, status: 'new' },
     ]);
     expect(toPointaucLots({ error: 'no tab' })).toEqual([]);
+    expect(toPointaucLots([{ id: 'x', name: 'old array shape' }])).toEqual([]);
   });
 
   it('encrypts the token so only the key opens it', async () => {
