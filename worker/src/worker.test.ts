@@ -27,6 +27,14 @@ describe('verifyJwt', () => {
     expect(await verifyJwt(token, secret, (exp + 1) * 1000)).toBeNull();
     expect(await verifyJwt(`${noneHeader}.${token.split('.')[1]}.`, secret)).toBeNull();
     expect(await verifyJwt('not.a.jwt!', secret)).toBeNull();
+    // Any other alg is refused even when the HS256 signature over it is valid.
+    const hs384 = `${btoa(JSON.stringify({ alg: 'HS384', typ: 'JWT' })).replace(/=+$/, '')}.${token.split('.')[1]}`;
+    const key = await crypto.subtle.importKey('raw', Uint8Array.from(atob(secret), (char) => char.charCodeAt(0)), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+    const hs384Signature = btoa(String.fromCharCode(...new Uint8Array(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(hs384)))))
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '');
+    expect(await verifyJwt(`${hs384}.${hs384Signature}`, secret)).toBeNull();
     expect(await verifyJwt('', secret)).toBeNull();
   });
 });
@@ -130,6 +138,20 @@ describe('Pointauc', () => {
     expect(stored).not.toContain('pointauc-token');
     expect(await decryptText(stored, key)).toBe('pointauc-token');
     await expect(decryptText(stored, btoa('x'.repeat(32)))).rejects.toThrow();
+  });
+
+  it('uses a fresh IV every time and rejects a tampered ciphertext', async () => {
+    const key = btoa('k'.repeat(32));
+    const [first, second] = [await encryptText('x', key), await encryptText('x', key)];
+    const iv = (stored: string) => atob(stored).slice(0, 12);
+    expect(iv(first)).not.toBe(iv(second));
+    const flip = (stored: string, index: number) => {
+      const bytes = [...atob(stored)];
+      bytes[index] = String.fromCharCode(bytes[index].charCodeAt(0) ^ 1);
+      return btoa(bytes.join(''));
+    };
+    await expect(decryptText(flip(first, 13), key)).rejects.toThrow();
+    await expect(decryptText(flip(first, atob(first).length - 1), key)).rejects.toThrow();
   });
 });
 
