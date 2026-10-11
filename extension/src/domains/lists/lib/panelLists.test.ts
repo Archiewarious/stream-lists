@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { buildSnapshot, type ChannelList, type ItemRow } from '@worker/snapshot';
 
-import { addPage, fromChannelLists, parseSnapshot, withPages, type PanelItem } from './panelLists';
+import { addPage, fromChannelLists, pagesToReload, parseSnapshot, putFirstPage, withPages, type PanelItem } from './panelLists';
 
 const item = (id: number, fields: Partial<ItemRow>): ItemRow => ({
   id,
@@ -94,5 +94,18 @@ describe('pages beyond the snapshot', () => {
     const next = { ...list, queue: [panelItem(4), ...list.queue] };
     expect(withPages([next], pages)[0].queue.map((each) => each.id)).toEqual([4, 1, 2, 5, 6]);
     expect(withPages([list], pages)[0].watched).toEqual(list.watched);
+  });
+
+  it('an item pushed out of the snapshot by a new one is not lost between the snapshot and the pages', () => {
+    const pages = addPage({}, 1, 'queue', [panelItem(4), panelItem(5)]);
+    const next = { ...list, queue: [panelItem(9), panelItem(1)] }; // 9 came in on top, 2 went past the snapshot
+    expect(pagesToReload([list], [next], pages)).toEqual([{ list: next, status: 'queue' }]);
+    // The page right after the snapshot, loaded again, goes in front of what was loaded.
+    const fresh = putFirstPage(pages, 1, 'queue', [panelItem(2), panelItem(4)]);
+    expect(withPages([next], fresh)[0].queue.map((each) => each.id)).toEqual([9, 1, 2, 4, 5]);
+    // The same items in the snapshot (new bids, new order) need nothing; neither does a status with no pages.
+    const reordered = { ...list, queue: [...list.queue].reverse() };
+    expect(pagesToReload([list], [reordered], pages)).toEqual([]);
+    expect(pagesToReload([list], [next], {})).toEqual([]);
   });
 });

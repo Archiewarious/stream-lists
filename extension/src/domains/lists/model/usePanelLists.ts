@@ -3,7 +3,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 
 import { VIEWER_PAGE, type SearchResult } from '@worker/snapshot';
 import { applyTheme } from '@app/presets';
-import { addPage, parseSnapshot, withPages, type LoadedPages, type PanelItem, type PanelList, type PanelSnapshot, type PanelStatus } from '@domains/lists/lib/panelLists';
+import { addPage, pagesToReload, parseSnapshot, putFirstPage, withPages, type LoadedPages, type PanelItem, type PanelList, type PanelSnapshot, type PanelStatus } from '@domains/lists/lib/panelLists';
 import { callWorker } from '@shared/api/workerApi';
 import { twitchApi } from '@shared/twitch/twitchApi';
 
@@ -18,6 +18,12 @@ export type Search = (listId: number, query: string) => Promise<SearchAnswer>;
 
 const pageKey = (listId: number, status: PanelStatus) => `${listId}:${status}`;
 
+/** The page of the list after what is shown of it. */
+const fetchPage = (list: PanelList, status: PanelStatus) => {
+  const params = new URLSearchParams({ list_id: String(list.id), status, offset: String(list[status].length) });
+  return callWorker<{ items: PanelItem[] }>('GET', `/api/viewer/items?${params}`).then(({ items }) => items);
+};
+
 /**
  * Viewer lists. The snapshot from the Twitch config shows up at once and follows PubSub updates; the rest of the
  * queue and the history come from the Worker a page at a time, as the viewer scrolls to them. A new snapshot only
@@ -28,15 +34,26 @@ export const usePanelLists = () => {
   const [pages, setPages] = useState<LoadedPages>({});
   const [pageStates, setPageStates] = useState<Record<string, PageState | undefined>>({});
   const inFlight = useRef(new Set<string>());
+  const pagesRef = useRef(pages);
+  pagesRef.current = pages;
 
   // A layout effect: the streamer's theme is painted before the first frame.
   useLayoutEffect(() => {
     let lastContent: string | undefined;
+    let previous: PanelList[] = [];
     const apply = (next: PanelSnapshot) => {
+      const stale = pagesToReload(previous, next.lists, pagesRef.current);
+      previous = next.lists;
       setSnapshot(next.lists);
       applyTheme(next.theme); // viewers see the streamer's theme
       // The counts may have grown: "no more" is asked again.
       setPageStates((current) => Object.fromEntries(Object.entries(current).filter(([, state]) => state !== 'end')));
+      // A failed reload leaves the pages as they were: the pushed-out item shows when the panel is opened again.
+      for (const { list, status } of stale) {
+        fetchPage(list, status)
+          .then((page) => setPages((current) => putFirstPage(current, list.id, status, page)))
+          .catch(() => {});
+      }
     };
     /** Returns whether there was a configuration to read. */
     const read = (content: string | undefined) => {
@@ -79,9 +96,8 @@ export const usePanelLists = () => {
     if (inFlight.current.has(key)) return;
     inFlight.current.add(key);
     setPageStates((current) => ({ ...current, [key]: 'loading' }));
-    const params = new URLSearchParams({ list_id: String(list.id), status, offset: String(list[status].length) });
-    callWorker<{ items: PanelItem[] }>('GET', `/api/viewer/items?${params}`)
-      .then(({ items }) => {
+    fetchPage(list, status)
+      .then((items) => {
         setPages((current) => addPage(current, list.id, status, items));
         // A short page is the end; so is a page of items already shown (the list moved under the offset).
         const shown = new Set(list[status].map((item) => item.id));

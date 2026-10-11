@@ -148,3 +148,26 @@ export const addPage = (pages: LoadedPages, listId: number, status: PanelStatus,
   const known = new Set(loaded.map((item) => item.id));
   return { ...pages, [listId]: { ...pages[listId], [status]: [...loaded, ...page.filter((item) => !known.has(item.id))] } };
 };
+
+/**
+ * Where a new snapshot shows other items first while pages beyond them are loaded. An item pushed past the first
+ * ones is then in neither, so the page right after them has to be loaded again.
+ */
+export const pagesToReload = (previous: PanelList[], next: PanelList[], pages: LoadedPages) =>
+  next.flatMap((list) => {
+    const before = previous.find((old) => old.id === list.id);
+    return (['queue', 'watched'] as const)
+      .filter((status) => {
+        if (!before || !pages[list.id]?.[status]?.length) return false;
+        const ids = new Set(before[status].map((item) => item.id));
+        return list[status].length !== ids.size || list[status].some((item) => !ids.has(item.id));
+      })
+      .map((status) => ({ list, status }));
+  });
+
+/** The page right after the snapshot, loaded again, in front of what was loaded (without the items it has). */
+export const putFirstPage = (pages: LoadedPages, listId: number, status: PanelStatus, page: PanelItem[]): LoadedPages => {
+  const known = new Set(page.map((item) => item.id));
+  const loaded = pages[listId]?.[status] ?? [];
+  return { ...pages, [listId]: { ...pages[listId], [status]: [...page, ...loaded.filter((item) => !known.has(item.id))] } };
+};
