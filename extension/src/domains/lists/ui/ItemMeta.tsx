@@ -7,13 +7,18 @@ const RATINGS = Array.from({ length: 10 }, (_, index) => index + 1);
 
 /** Pointauc bid on the title; 0 for a lot nobody bid on, nothing for a title that is not from an auction. */
 export const Points = ({ value }: { value: number | null }) => {
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation();
   if (value === null) return null;
 
+  const formatted = value.toLocaleString(i18n.language);
   return (
-    <span className="inline-flex shrink-0 items-center gap-px text-xs font-extrabold text-[var(--primary-text)] tabular-nums">
-      <IconBolt size={12} />
-      {value.toLocaleString(i18n.language)}
+    <span
+      className="inline-flex shrink-0 items-center gap-px text-xs font-extrabold text-[var(--primary-text)] tabular-nums"
+      title={t('panel.points')}
+    >
+      <span className="sr-only">{t('panel.points')}: </span>
+      <IconBolt size={12} aria-hidden="true" />
+      {formatted}
     </span>
   );
 };

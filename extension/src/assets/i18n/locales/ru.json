@@ -48,7 +48,8 @@
     "loadFailed": "Не загрузилось.",
     "retry": "Повторить",
     "refine": "Показаны первые {{count}} — уточните запрос",
-    "creditLink": "Archiewarious — канал на Twitch, откроется в новой вкладке"
+    "creditLink": "Archiewarious — канал на Twitch, откроется в новой вкладке",
+    "points": "Баллы аукциона"
   },
   "config": {
     "yourLists": "Ваши списки",

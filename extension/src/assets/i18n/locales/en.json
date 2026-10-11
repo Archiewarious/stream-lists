@@ -48,7 +48,8 @@
     "loadFailed": "Couldn't load.",
     "retry": "Retry",
     "refine": "The first {{count}} are shown — type more to narrow it down",
-    "creditLink": "Archiewarious — Twitch channel, opens in a new tab"
+    "creditLink": "Archiewarious — Twitch channel, opens in a new tab",
+    "points": "Auction points"
   },
   "config": {
     "yourLists": "Your lists",
