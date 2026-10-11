@@ -23,7 +23,7 @@ import type { ItemRow } from '@worker/snapshot';
 import { formatDay, groupByMonth } from '@domains/lists/lib/items';
 import type { ListKind } from '@domains/lists/model/useChannel';
 import { HIDE_ON_HOVER, SHOW_ON_HOVER } from '@domains/lists/ui/hoverActions';
-import { Points, RatingBadge } from '@domains/lists/ui/ItemMeta';
+import { Points, PointsBar, RatingBadge } from '@domains/lists/ui/ItemMeta';
 import ConfirmPopover from '@shared/ui/ConfirmPopover';
 import Poster from '@shared/ui/Poster';
 
@@ -68,7 +68,7 @@ const EditButton = ({ item, onEdit }: { item: ItemRow; onEdit: ItemActions['onEd
   );
 };
 
-const QueueRow = ({ item, index, kind, isCompact, ...actions }: RowProps & { item: ItemRow; index: number }) => {
+const QueueRow = ({ item, index, kind, isCompact, maxPoints, ...actions }: RowProps & { item: ItemRow; index: number; maxPoints: number }) => {
   const { t } = useTranslation();
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
     id: item.id,
@@ -78,7 +78,7 @@ const QueueRow = ({ item, index, kind, isCompact, ...actions }: RowProps & { ite
     <div
       ref={setNodeRef}
       style={{ transform: CSS.Translate.toString(transform), transition }}
-      className={`group relative flex h-11 items-center gap-2 rounded-xl px-1.5 text-[13px] font-bold hover:selected ${
+      className={`group relative flex h-[50px] items-center gap-2 rounded-xl px-1.5 text-[13px] font-bold hover:selected ${
         isDragging ? 'selected z-10' : ''
       }`}
     >
@@ -92,11 +92,16 @@ const QueueRow = ({ item, index, kind, isCompact, ...actions }: RowProps & { ite
         <IconGripVertical size={14} />
       </button>
       <span className="w-4 shrink-0 text-right text-[11px] text-fg-3 tabular-nums">{index + 1}</span>
-      <Poster path={item.poster_path} width={22} />
-      <span className="min-w-0 flex-1 truncate">{item.title}</span>
-      <span className={`flex items-center gap-1.5 ${HIDE_ON_HOVER}`}>
+      <Poster path={item.poster_path} width={24} />
+      <span className="flex min-w-0 flex-1 flex-col gap-1">
+        <span className="truncate leading-tight">{item.title}</span>
+        <span className="flex min-h-[12px] items-center gap-2 text-[11px] font-semibold text-fg-3">
+          {item.year && <span className="tabular-nums">{item.year}</span>}
+          <PointsBar value={item.points} max={maxPoints} />
+        </span>
+      </span>
+      <span className={`flex items-center ${HIDE_ON_HOVER}`}>
         <Points value={item.points} />
-        {item.year && <span className="text-xs text-fg-3 tabular-nums">{item.year}</span>}
       </span>
       <span className={`items-center gap-0.5 ${SHOW_ON_HOVER}`}>
         {isCompact ? (
@@ -137,12 +142,13 @@ export const QueueList = ({ items, onReorder, emptyText, isCompact = false, ...r
   };
 
   if (!items.length) return <p className="px-2 py-6 text-center text-sm text-fg-3">{emptyText}</p>;
+  const maxPoints = Math.max(0, ...items.map((item) => item.points ?? 0));
 
   return (
     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
       <SortableContext items={items.map((item) => item.id)} strategy={verticalListSortingStrategy}>
         {items.map((item, index) => (
-          <QueueRow key={item.id} item={item} index={index} isCompact={isCompact} {...rowProps} />
+          <QueueRow key={item.id} item={item} index={index} isCompact={isCompact} maxPoints={maxPoints} {...rowProps} />
         ))}
       </SortableContext>
     </DndContext>
@@ -168,16 +174,18 @@ export const WatchedList = ({ items, emptyText, isCompact = false, ...actions }:
         <span className="label">{month.items.length}</span>
       </div>
       {month.items.map((item) => (
-        <div key={item.id} className="group flex h-11 items-center gap-2 rounded-xl px-1.5 text-[13px] font-bold hover:selected">
+        <div key={item.id} className="group flex h-[50px] items-center gap-2 rounded-xl px-1.5 text-[13px] font-bold hover:selected">
           <span className="opacity-70">
-            <Poster path={item.poster_path} width={22} />
+            <Poster path={item.poster_path} width={24} />
           </span>
-          <span className="min-w-0 flex-1 truncate">{item.title}</span>
-          <RatingBadge rating={item.rating} onChange={(rating) => actions.onRate(item.id, rating)} />
-          <span className={`flex items-center gap-1.5 text-xs text-fg-3 ${HIDE_ON_HOVER}`}>
-            <Points value={item.points} />
+          <span className="flex min-w-0 flex-1 flex-col gap-1">
+            <span className="truncate leading-tight">{item.title}</span>
+            <span className="min-h-[12px] text-[11px] font-semibold text-fg-3 tabular-nums">{item.year}</span>
+          </span>
+          <span className={`text-xs font-semibold text-fg-3 ${HIDE_ON_HOVER}`}>
             {item.watched_at && formatDay(item.watched_at, i18n.language)}
           </span>
+          <RatingBadge rating={item.rating} onChange={(rating) => actions.onRate(item.id, rating)} />
           <span className={`items-center gap-0.5 ${SHOW_ON_HOVER}`}>
             {isCompact ? (
               <ActionIcon

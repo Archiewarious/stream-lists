@@ -11,9 +11,26 @@ export const Points = ({ value }: { value: number | null }) => {
   if (!value) return null;
 
   return (
-    <span className="inline-flex shrink-0 items-center gap-px text-xs font-bold text-fg-3 tabular-nums">
+    <span className="inline-flex shrink-0 items-center gap-px text-xs font-extrabold text-[var(--primary-hi)] tabular-nums">
       <IconBolt size={12} />
       {value.toLocaleString(i18n.language)}
+    </span>
+  );
+};
+
+/** A thin bar: this bid against the biggest one in the queue. */
+export const PointsBar = ({ value, max }: { value: number | null; max: number }) => {
+  if (!value || !max) return null;
+
+  return (
+    <span className="h-[3px] min-w-0 flex-1 overflow-hidden rounded-full bg-white/10">
+      <span
+        className="block h-full rounded-full"
+        style={{
+          width: `${Math.max(6, Math.round((value / max) * 100))}%`,
+          background: 'linear-gradient(90deg, var(--primary-lo), var(--primary-hi))',
+        }}
+      />
     </span>
   );
 };

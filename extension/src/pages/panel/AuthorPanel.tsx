@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next';
 import type { ItemRow } from '@worker/snapshot';
 import { matchesTitle } from '@domains/lists/lib/items';
 import { useAddItem } from '@domains/lists/model/useAddItem';
-import { useChannel, type ItemStatus } from '@domains/lists/model/useChannel';
+import type { Channel, ItemStatus } from '@domains/lists/model/useChannel';
 import AddItemBar from '@domains/lists/ui/AddItemBar';
 import PendingLotsModal from '@domains/integrations/pointauc/ui/PendingLotsModal';
 import ItemEditModal from '@domains/lists/ui/ItemEditModal';
@@ -16,14 +16,15 @@ import ListSwitcher from '@domains/lists/ui/ListSwitcher';
 type Tab = 'queue' | 'watched';
 
 interface AuthorPanelProps {
+  /** The streamer's lists; owned by PanelPage so the viewer preview shows the same live data. */
+  channel: Channel;
   /** Shows the panel the way viewers see it. */
   onViewAsViewer: () => void;
 }
 
 /** The streamer's panel on the channel page: the same lists, editable right there. Writes are checked by the Worker. */
-const AuthorPanel = ({ onViewAsViewer }: AuthorPanelProps) => {
+const AuthorPanel = ({ channel, onViewAsViewer }: AuthorPanelProps) => {
   const { t } = useTranslation();
-  const channel = useChannel();
   const [activeListId, setActiveListId] = useState<number | null>(null);
   const [tab, setTab] = useState<Tab>('queue');
   const [query, setQuery] = useState('');

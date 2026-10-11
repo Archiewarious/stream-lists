@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { formatDay, groupByMonth } from '@domains/lists/lib/items';
 import { checkIsTrimmed, type PanelItem, type PanelList } from '@domains/lists/lib/panelLists';
 import { usePanelLists } from '@domains/lists/model/usePanelLists';
-import { Points, RatingBadge } from '@domains/lists/ui/ItemMeta';
+import { Points, PointsBar, RatingBadge } from '@domains/lists/ui/ItemMeta';
 import ListSwitcher from '@domains/lists/ui/ListSwitcher';
 import PanelSearchResults from '@domains/lists/ui/PanelSearchResults';
 import MovieDetailsModal, { type DetailsTarget } from '@domains/movies/ui/MovieDetailsModal';
@@ -20,13 +20,14 @@ type OpenDetails = (item: PanelItem) => void;
 
 /** A row is a button when TMDB knows the title: its card opens on click. */
 const rowClass = (item: PanelItem) =>
-  `flex h-[46px] w-full items-center gap-2.5 rounded-xl px-1.5 text-left text-[13px] font-bold ${
+  `flex h-[50px] w-full items-center gap-2.5 rounded-xl px-1.5 text-left text-[13px] font-bold ${
     item.tmdb_id ? 'cursor-pointer hover:selected' : ''
   }`;
 
 const QueueRows = ({ list, onOpen }: { list: PanelList; onOpen: OpenDetails }) => {
   const { t } = useTranslation();
   if (!list.queue.length) return <Empty text={t('panel.emptyQueue')} />;
+  const maxPoints = Math.max(0, ...list.queue.map((item) => item.points ?? 0));
 
   return list.queue.map((item, index) => (
     <div
@@ -39,9 +40,14 @@ const QueueRows = ({ list, onOpen }: { list: PanelList; onOpen: OpenDetails }) =
     >
       <span className="w-3.5 shrink-0 text-right text-[11px] text-fg-3 tabular-nums">{index + 1}</span>
       <Poster path={item.poster_path} width={24} />
-      <span className="min-w-0 flex-1 truncate">{item.title}</span>
+      <span className="flex min-w-0 flex-1 flex-col gap-1">
+        <span className="truncate leading-tight">{item.title}</span>
+        <span className="flex min-h-[12px] items-center gap-2 text-[11px] font-semibold text-fg-3">
+          {item.year && <span className="tabular-nums">{item.year}</span>}
+          <PointsBar value={item.points} max={maxPoints} />
+        </span>
+      </span>
       <Points value={item.points} />
-      {item.year && <span className="text-xs text-fg-3 tabular-nums">{item.year}</span>}
     </div>
   ));
 };
@@ -68,9 +74,14 @@ const WatchedRows = ({ list, onOpen }: { list: PanelList; onOpen: OpenDetails })
           <span className="opacity-70">
             <Poster path={item.poster_path} width={24} />
           </span>
-          <span className="min-w-0 flex-1 truncate">{item.title}</span>
+          <span className="flex min-w-0 flex-1 flex-col gap-1">
+            <span className="truncate leading-tight">{item.title}</span>
+            <span className="min-h-[12px] text-[11px] font-semibold text-fg-3 tabular-nums">{item.year}</span>
+          </span>
+          <span className="text-[11px] font-semibold text-fg-3">
+            {item.watched_at && formatDay(item.watched_at, i18n.language)}
+          </span>
           <RatingBadge rating={item.rating} />
-          <span className="text-[11px] text-fg-3">{item.watched_at && formatDay(item.watched_at, i18n.language)}</span>
         </div>
       ))}
     </div>
@@ -85,14 +96,22 @@ const Count = ({ label, count }: { label: string; count: number }) => (
 );
 
 interface ViewerPanelProps {
+  /**
+   * Lists to show instead of Twitch's snapshot: the streamer's preview uses the live data from the Worker, because
+   * the snapshot the Twitch helper holds is only as fresh as the page load.
+   */
+  lists?: PanelList[] | null;
   /** The streamer previewing the viewer's view gets a way back to editing. */
   onEdit?: () => void;
 }
 
 /** What viewers see: the snapshot from Twitch right away, the full history from the Worker when needed. */
-const ViewerPanel = ({ onEdit }: ViewerPanelProps) => {
+const ViewerPanel = ({ onEdit, lists: liveLists }: ViewerPanelProps) => {
   const { t } = useTranslation();
-  const { lists, isFull, loadFull } = usePanelLists();
+  const snapshot = usePanelLists();
+  const lists = liveLists === undefined ? snapshot.lists : liveLists;
+  const isFull = liveLists === undefined ? snapshot.isFull : true;
+  const { loadFull } = snapshot;
   const [activeListId, setActiveListId] = useState<number | null>(null);
   const [tab, setTab] = useState<Tab>('queue');
   const [query, setQuery] = useState('');
