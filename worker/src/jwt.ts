@@ -1,5 +1,7 @@
 // Twitch extension JWT: HS256, the key is the extension secret (base64-encoded in the Twitch console).
 
+import { base64ToBytes, bytesToBase64 } from './base64';
+
 export interface TwitchJwtPayload {
   exp: number;
   channel_id: string;
@@ -10,11 +12,9 @@ export interface TwitchJwtPayload {
 
 const encoder = new TextEncoder();
 
-const base64ToBytes = (base64: string) => Uint8Array.from(atob(base64), (char) => char.charCodeAt(0));
 const base64UrlToBytes = (base64Url: string) => base64ToBytes(base64Url.replace(/-/g, '+').replace(/_/g, '/'));
 const base64UrlToText = (base64Url: string) => new TextDecoder().decode(base64UrlToBytes(base64Url));
-const bytesToBase64Url = (bytes: Uint8Array) =>
-  btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const bytesToBase64Url = (bytes: Uint8Array) => bytesToBase64(bytes).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 const textToBase64Url = (text: string) => bytesToBase64Url(encoder.encode(text));
 
 const importKey = (secret: string) =>

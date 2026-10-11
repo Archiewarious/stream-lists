@@ -421,6 +421,13 @@ describe('automatic Pointauc sync', () => {
     ]);
   });
 
+  it('switching the sync on publishes once, from its first pass', async () => {
+    const { list } = await w.seedList('sync-once', 'movies');
+    const sync = await w.connectPointauc('sync-once', list.id, 'token-once-0000', [{ id: 'L1', name: 'Heat', amount: 3 }]);
+    expect(sync.published.length).toBe(1);
+    expect(sync.published[0].lists[0].q[0]).toMatchObject({ t: 'Heat', b: 3 });
+  });
+
   it('refreshes bids, publishes only when something changed', async () => {
     const { list } = await w.seedList('bids', 'movies');
     await w.connectPointauc('bids', list.id, 'token-bids-0000', [{ id: 'L1', name: 'Dune', amount: 10 }]);

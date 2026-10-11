@@ -12,7 +12,9 @@
     "CLIENT_ID": "rlbp8y9c7l7hqp9p77r8awnggble5p",
     "OWNER_ID": "245767379"
   },
-  // Secret EXTENSION_SECRET: `wrangler secret put EXTENSION_SECRET` (locally — in .dev.vars).
+  // Secrets (`wrangler secret put <NAME>`; locally — in .dev.vars): EXTENSION_SECRET (Twitch extension secret),
+  // TMDB_API_KEY, TOKEN_ENCRYPTION_KEY (base64 of 32 random bytes; changing it means entering Pointauc tokens again);
+  // during a secret rotation also EXTENSION_SECRET_PREVIOUS (the old extension secret, deleted once the new one works).
   "d1_databases": [
     {
       "binding": "DB",

@@ -1,9 +1,10 @@
 // HTTP tests of the Worker: the real fetch handler in Node against SQLite with all migrations applied. Outbound calls
 // (Twitch, TMDB, Pointauc) are faked and recorded.
 //
-// The database is Node's built-in SQLite (./sqlite-d1.ts). `TEST_D1=workerd npm test` runs the same tests against a
-// real local D1 (workerd, in memory) from wrangler's getPlatformProxy — worth it after a new migration. It is not the
-// default: Node 24 on Windows dies at random (0xC0000409, no report) talking to workerd, up to every other run.
+// The database is Node's built-in SQLite (./sqlite-d1.ts). `TEST_D1=workerd npx vitest run test/ --testTimeout=60000`
+// runs the same tests against a real local D1 (workerd, in memory) from wrangler's getPlatformProxy — worth it after a
+// new migration; it is slower, hence the timeout. It is not the default: Node 24 on Windows dies at random (0xC0000409,
+// no report) talking to workerd, up to every other run — run it a few times, or one file at a time.
 import { readdirSync, readFileSync } from 'node:fs';
 import { vi } from 'vitest';
 import { getPlatformProxy } from 'wrangler';

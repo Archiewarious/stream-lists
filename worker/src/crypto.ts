@@ -1,7 +1,6 @@
 // AES-GCM for secrets stored in D1 (the Pointauc token). Key: TOKEN_ENCRYPTION_KEY, 32 random bytes in base64.
 
-const base64ToBytes = (base64: string) => Uint8Array.from(atob(base64), (char) => char.charCodeAt(0));
-const bytesToBase64 = (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes));
+import { base64ToBytes, bytesToBase64 } from './base64';
 
 const importKey = (keyBase64: string) =>
   crypto.subtle.importKey('raw', base64ToBytes(keyBase64), 'AES-GCM', false, ['encrypt', 'decrypt']);
