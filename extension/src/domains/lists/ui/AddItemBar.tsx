@@ -9,8 +9,8 @@ import MovieSearchInput from '@domains/movies/ui/MovieSearchInput';
 
 interface AddItemBarProps {
   kind: ListKind;
-  /** Returns a message when the title was not added (already in the list). */
-  onAdd: (title: string, movie?: MovieFields) => string | null;
+  /** Resolves with a message when the title was not added (already in the list, or saving failed). */
+  onAdd: (title: string, movie?: MovieFields) => Promise<string | null>;
   /** "Paste a list" — only offered when given. Resolves false when saving failed: the pasted text stays. */
   onBulk?: (titles: string[], status: ItemStatus) => Promise<boolean>;
   /** Narrow panel: shorter hint and a smaller field. */
@@ -37,10 +37,12 @@ const AddItemBar = ({ kind, onAdd, onBulk, isCompact, target = 'queue' }: AddIte
     add(title.trim());
   };
 
-  const add = (nextTitle: string, movie?: MovieFields) => {
-    const error = onAdd(nextTitle, movie);
+  // The field is cleared once the title is saved: one that failed stays to be sent again.
+  const add = async (nextTitle: string, movie?: MovieFields) => {
+    const typed = title;
+    const error = await onAdd(nextTitle, movie);
     setAddError(error);
-    if (!error) setTitle('');
+    if (!error) setTitle((current) => (current === typed ? '' : current)); // unless the next title is being typed already
   };
 
   const submitBulk = async (status: ItemStatus) => {
@@ -98,7 +100,8 @@ const AddItemBar = ({ kind, onAdd, onBulk, isCompact, target = 'queue' }: AddIte
               maxRows={14}
               value={bulkText}
               onChange={(event) => setBulkText(event.currentTarget.value)}
-              placeholder={'Матрица\nТроя\nЧужой'}
+              placeholder={t('config.bulkPlaceholder')}
+              aria-label={t('config.bulkTitle')}
               error={isTooMany && t('config.bulkTooMany', { max: MAX_BULK_ITEMS })}
               classNames={{ input: '!rounded-[18px]' }}
               data-autofocus

@@ -17,18 +17,24 @@ export const createDevTwitchApi = (): TwitchApi => {
 
   return {
     workerUrl: 'http://127.0.0.1:8787',
-    onAuthorized: async (callback) => {
+    onAuthorized: (callback) => {
+      let isActive = true;
       const exp = Math.floor(Date.now() / 1000) + 24 * 60 * 60;
       const role = new URLSearchParams(window.location.search).get('role') ?? 'broadcaster'; // ?role=viewer
-      const token = await signJwt({ exp, channel_id: DEV_CHANNEL_ID, role }, DEV_SECRET);
-      callback({ token, channelId: DEV_CHANNEL_ID });
+      signJwt({ exp, channel_id: DEV_CHANNEL_ID, role }, DEV_SECRET).then((token) => isActive && callback({ token, channelId: DEV_CHANNEL_ID }));
+      return () => {
+        isActive = false;
+      };
     },
     getBroadcasterConfig: () => localStorage.getItem(STORAGE_KEY) ?? undefined,
     onConfigChanged: (callback) => {
-      setTimeout(callback);
-      window.addEventListener('storage', (event) => {
-        if (event.key === STORAGE_KEY) callback();
-      });
+      const timer = setTimeout(callback);
+      const handleStorage = (event: StorageEvent) => event.key === STORAGE_KEY && callback();
+      window.addEventListener('storage', handleStorage);
+      return () => {
+        clearTimeout(timer);
+        window.removeEventListener('storage', handleStorage);
+      };
     },
     listenBroadcast: (callback) => {
       const handleMessage = (event: MessageEvent<string>) => callback(event.data);

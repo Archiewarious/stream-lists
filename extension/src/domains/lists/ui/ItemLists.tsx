@@ -8,7 +8,6 @@ import {
   type DragEndEvent,
 } from '@dnd-kit/core';
 import {
-  arrayMove,
   SortableContext,
   sortableKeyboardCoordinates,
   useSortable,
@@ -20,7 +19,7 @@ import { IconArrowBackUp, IconCheck, IconGripVertical, IconPencil, IconTrash } f
 import { useTranslation } from 'react-i18next';
 
 import type { ItemRow } from '@worker/snapshot';
-import { formatDay, groupByMonth } from '@domains/lists/lib/items';
+import { dragQueueOrder, formatDay, groupByMonth } from '@domains/lists/lib/items';
 import type { ListKind } from '@domains/lists/model/useChannel';
 import { HIDE_ON_HOVER, SHOW_ON_HOVER } from '@domains/lists/ui/hoverActions';
 import { Points, RatingBadge } from '@domains/lists/ui/ItemMeta';
@@ -68,7 +67,7 @@ const EditButton = ({ item, onEdit }: { item: ItemRow; onEdit: ItemActions['onEd
   );
 };
 
-const QueueRow = ({ item, index, kind, isCompact, ...actions }: RowProps & { item: ItemRow; index: number }) => {
+const QueueRow = ({ item, place, kind, isCompact, ...actions }: RowProps & { item: ItemRow; place: number }) => {
   const { t } = useTranslation();
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
     id: item.id,
@@ -77,6 +76,8 @@ const QueueRow = ({ item, index, kind, isCompact, ...actions }: RowProps & { ite
   return (
     <div
       ref={setNodeRef}
+      // A row with a bid has no drag handle: it takes the focus itself, so its actions can be reached by keyboard.
+      tabIndex={item.points === null ? undefined : 0}
       style={{ transform: CSS.Translate.toString(transform), transition }}
       className={`group relative flex min-h-[50px] items-center gap-2 py-1 rounded-xl px-1.5 text-[13px] font-bold hover:selected ${
         isDragging ? 'selected z-10' : ''
@@ -86,16 +87,17 @@ const QueueRow = ({ item, index, kind, isCompact, ...actions }: RowProps & { ite
         <button
           ref={setActivatorNodeRef}
           type="button"
-          className="cursor-grab touch-none text-fg-3 opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+          className="cursor-grab touch-none text-fg-3 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
           {...attributes}
           {...listeners}
+          aria-label={t('dnd.handle', { title: item.title })}
         >
           <IconGripVertical size={14} />
         </button>
       ) : (
         <span className="w-3.5 shrink-0" /> // a title with a bid has its place by the bid
       )}
-      <span className="w-4 shrink-0 text-right text-[11px] text-fg-3 tabular-nums">{index + 1}</span>
+      <span className="w-4 shrink-0 text-right text-[11px] text-fg-3 tabular-nums">{place}</span>
       <Poster path={item.poster_path} width={24} />
       <span className="flex min-w-0 flex-1 flex-col gap-1">
         <span className="line-clamp-2 leading-tight">{item.title}</span>
@@ -127,28 +129,42 @@ interface QueueListProps extends ItemActions {
   isCompact?: boolean;
   emptyText: string;
   onReorder: (ids: number[]) => void;
+  /** Places in the whole queue, when the items are only some of it (a search). */
+  places?: Map<number, number>;
 }
 
 /** The queue with drag & drop and the streamer's actions on every row. */
-export const QueueList = ({ items, onReorder, emptyText, isCompact = false, ...rowProps }: QueueListProps) => {
+export const QueueList = ({ items, onReorder, emptyText, isCompact = false, places, ...rowProps }: QueueListProps) => {
+  const { t } = useTranslation();
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
   const handleDragEnd = ({ active, over }: DragEndEvent) => {
-    if (!over || active.id === over.id) return;
-    const ids = items.map((item) => item.id);
-    onReorder(arrayMove(ids, ids.indexOf(Number(active.id)), ids.indexOf(Number(over.id))));
+    const ids = over && dragQueueOrder(items, Number(active.id), Number(over.id));
+    if (ids) onReorder(ids);
+  };
+  const titleOf = (id: string | number) => items.find((item) => item.id === Number(id))?.title ?? '';
+  const placeOf = (id: string | number) => items.findIndex((item) => item.id === Number(id)) + 1;
+  // What a screen reader hears while a title is dragged with the keyboard.
+  const accessibility = {
+    screenReaderInstructions: { draggable: t('dnd.instructions') },
+    announcements: {
+      onDragStart: ({ active }: DragEndEvent) => t('dnd.picked', { title: titleOf(active.id) }),
+      onDragOver: ({ active, over }: DragEndEvent) => (over ? t('dnd.over', { title: titleOf(active.id), place: placeOf(over.id) }) : undefined),
+      onDragEnd: ({ active, over }: DragEndEvent) => (over ? t('dnd.dropped', { title: titleOf(active.id), place: placeOf(over.id) }) : undefined),
+      onDragCancel: ({ active }: DragEndEvent) => t('dnd.cancelled', { title: titleOf(active.id) }),
+    },
   };
 
   if (!items.length) return <p className="px-2 py-6 text-center text-sm text-fg-3">{emptyText}</p>;
 
   return (
-    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd} accessibility={accessibility}>
       <SortableContext items={items.map((item) => item.id)} strategy={verticalListSortingStrategy}>
         {items.map((item, index) => (
-          <QueueRow key={item.id} item={item} index={index} isCompact={isCompact} {...rowProps} />
+          <QueueRow key={item.id} item={item} place={places?.get(item.id) ?? index + 1} isCompact={isCompact} {...rowProps} />
         ))}
       </SortableContext>
     </DndContext>
@@ -175,7 +191,7 @@ export const WatchedList = ({ items, emptyText, isCompact = false, ...actions }:
       </div>
       {month.items.map((item) => (
         <div key={item.id} className="group flex min-h-[50px] items-center gap-2 rounded-xl px-1.5 py-1 text-[13px] font-bold hover:selected">
-          <span className="opacity-70">
+          <span className="flex opacity-70">
             <Poster path={item.poster_path} width={24} />
           </span>
           <span className="flex min-w-0 flex-1 flex-col gap-1">

@@ -6,8 +6,9 @@ import { formatDay } from '@domains/lists/lib/items';
 import type { Channel, ItemStatus, MovieFields } from '@domains/lists/model/useChannel';
 
 /**
- * Adds a title (to the queue or straight to "watched") unless the list already has it. Returns a message about
- * where it is when it was not added, null when it was. `onAddedWatched` gets the new watched item (to ask for a rating).
+ * Adds a title (to the queue or straight to "watched") unless the list already has it. Resolves with a message when
+ * it was not added (where it is already, or why saving failed), null when it was. `onAddedWatched` gets the new
+ * watched item (to ask for a rating).
  */
 export const useAddItem = (
   channel: Channel,
@@ -17,7 +18,7 @@ export const useAddItem = (
 ) => {
   const { t, i18n } = useTranslation();
 
-  return (title: string, movie?: MovieFields): string | null => {
+  return async (title: string, movie?: MovieFields): Promise<string | null> => {
     if (!list) return null;
     const existing = list.items.find((item) => normalizeTitle(item.title) === normalizeTitle(title));
 
@@ -30,9 +31,9 @@ export const useAddItem = (
       return t('config.duplicateWatched', { status: t(`columns.${list.kind}.seenChip`, { date }) });
     }
 
-    channel.addItem(list.id, title, status, movie).then((item) => {
-      if (item && status === 'watched') onAddedWatched?.(item);
-    });
+    const item = await channel.addItem(list.id, title, status, movie);
+    if (!item) return t('config.addFailed'); // the reason is in the save error
+    if (status === 'watched') onAddedWatched?.(item);
     return null;
   };
 };

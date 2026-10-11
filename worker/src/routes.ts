@@ -10,14 +10,13 @@ import {
   MAX_LISTS,
   MAX_TMDB_LOOKUPS,
   SUBREQUEST_LIMIT,
-  VIEWER_PAGE,
   type Env,
 } from './config';
 import { encryptText } from './crypto';
 import { HttpError, readBody, readEnum, readMovieFields, readOptionalInt, readStatus, readTitle } from './http';
 import { matchLots, normalizeTitle } from './pointauc';
 import { buildChannelSnapshot } from './publish';
-import { searchItems, VIEWER_FIELDS, type ItemRow, type ListRow, type ViewerItem } from './snapshot';
+import { searchItems, VIEWER_FIELDS, VIEWER_PAGE, type ItemRow, type ListRow, type ViewerItem } from './snapshot';
 import {
   getOwnedItem,
   getOwnedList,

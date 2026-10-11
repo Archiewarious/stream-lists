@@ -22,9 +22,11 @@ const ItemEditModal = ({ item, kind, onClose, onSave, isFullScreen }: ItemEditMo
   const { t } = useTranslation();
   const [title, setTitle] = useState('');
 
+  // Filled when another row opens — not when the same item changes under the dialog (a rating, a reload): that would
+  // wipe what is being typed.
   useEffect(() => {
     if (item) setTitle(item.title);
-  }, [item]);
+  }, [item?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();

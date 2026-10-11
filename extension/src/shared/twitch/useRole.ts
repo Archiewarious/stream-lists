@@ -18,9 +18,7 @@ const readRole = (token: string): Role | null => {
 export const useRole = () => {
   const [role, setRole] = useState<Role | null>(null);
 
-  useEffect(() => {
-    twitchApi.onAuthorized(({ token }) => setRole(readRole(token)));
-  }, []);
+  useEffect(() => twitchApi.onAuthorized(({ token }) => setRole(readRole(token))), []);
 
   return role;
 };

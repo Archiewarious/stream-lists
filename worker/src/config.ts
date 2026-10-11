@@ -44,5 +44,3 @@ export const SYNC_GIVE_UP_MS = 30 * 24 * 60 * 60_000;
 // long; the cron deletes a few per run.
 export const HIDDEN_LOT_TTL_MS = 90 * 24 * 60 * 60_000;
 export const HIDDEN_LOTS_PER_RUN = 50;
-// Viewers get the queue and the history beyond the snapshot this many items at a time, and this many search results.
-export const VIEWER_PAGE = 30;

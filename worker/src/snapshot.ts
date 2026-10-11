@@ -96,6 +96,9 @@ export const buildSnapshot = (lists: ChannelList[], theme: ChannelTheme | null =
   throw new Error('Snapshot exceeds 5 KB even without items');
 };
 
+// Viewers get the queue and the history beyond the snapshot this many items at a time, and this many search results.
+export const VIEWER_PAGE = 30;
+
 /** The item fields a viewer's panel shows (the snapshot's, in full). */
 export const VIEWER_FIELDS = ['id', 'title', 'year', 'poster_path', 'watched_at', 'points', 'rating', 'tmdb_id', 'tmdb_type'] as const;
 export type ViewerItem = Pick<ItemRow, (typeof VIEWER_FIELDS)[number]>;

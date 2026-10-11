@@ -20,6 +20,9 @@ export interface ImportLot extends PointaucLot {
 /** How titles are compared: case, ё/е, extra spaces and Unicode composition do not matter. */
 export const normalizeTitle = (title: string) => title.normalize('NFC').toLowerCase().replace(/ё/g, 'е').replace(/\s+/g, ' ').trim();
 
+/** The first `max` characters of a title, without cutting a character that takes two UTF-16 units (emoji) in half. */
+export const clipTitle = (title: string, max: number) => (title.length <= max ? title : Array.from(title).slice(0, max).join(''));
+
 /**
  * GET /api/oshino/lots answers { lots: [{ fastId, id, name, amount, investors }] }; anything malformed is skipped.
  * A lot id holds only while the streamer's Pointauc tab stays open (a reload makes new ones; fastId is just a number
@@ -29,7 +32,7 @@ export const toPointaucLots = (data: unknown): PointaucLot[] =>
   (Array.isArray((data as { lots?: unknown })?.lots) ? (data as { lots: any[] }).lots : [])
     .map((raw) => ({
       id: String(raw?.id ?? ''),
-      name: typeof raw?.name === 'string' ? raw.name.replace(/\p{Cc}/gu, '').trim().slice(0, 200) : '',
+      name: typeof raw?.name === 'string' ? clipTitle(raw.name.replace(/\p{Cc}/gu, '').trim(), 200) : '',
       amount: Number(raw?.amount) || 0,
     }))
     .filter((lot) => lot.id && lot.name);

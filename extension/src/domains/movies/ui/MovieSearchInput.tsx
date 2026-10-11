@@ -44,18 +44,18 @@ const MovieSearchInput = ({
   const { t, i18n } = useTranslation();
   const combobox = useCombobox({ onDropdownClose: () => combobox.resetSelectedOption() });
   const [debouncedValue] = useDebouncedValue(value.trim(), 300);
-  const [results, setResults] = useState<TmdbResult[]>([]);
+  // Suggestions with the text they were found for: once the text changes they are gone, so Enter never picks a
+  // movie found for what was typed before.
+  const [found, setFound] = useState<{ query: string; results: TmdbResult[] }>({ query: '', results: [] });
+  const results = found.query === value.trim() ? found.results : [];
 
   useEffect(() => {
-    if (!withSuggestions || debouncedValue.length < MIN_QUERY_LENGTH) {
-      setResults([]);
-      return;
-    }
+    if (!withSuggestions || debouncedValue.length < MIN_QUERY_LENGTH) return;
     let isCancelled = false;
     const params = new URLSearchParams({ q: debouncedValue, lang: i18n.language });
     callWorker<TmdbResult[]>('GET', `/api/tmdb/search?${params}`)
-      .then((nextResults) => !isCancelled && setResults(nextResults))
-      .catch(() => !isCancelled && setResults([])); // no key or TMDB down: adding still works without posters
+      .then((nextResults) => !isCancelled && setFound({ query: debouncedValue, results: nextResults }))
+      .catch(() => {}); // no key or TMDB down: adding still works without posters
     return () => {
       isCancelled = true;
     };
@@ -67,14 +67,15 @@ const MovieSearchInput = ({
 
   const pick = (optionValue: string) => {
     const result = results[Number(optionValue)];
-    if (result) onPick(result.title, {
-        tmdb_id: result.tmdb_id,
-        year: result.year,
-        poster_path: result.poster_path,
-        tmdb_type: result.type,
-      });
-    else onPick(value.trim());
-    setResults([]);
+    if (result) {
+      onPick(result.title, { tmdb_id: result.tmdb_id, year: result.year, poster_path: result.poster_path, tmdb_type: result.type });
+    } else if (plainLabelKey === 'movies.withoutPoster') {
+      // "Add without a poster" means it: the Worker does not look the title up either.
+      onPick(value.trim(), { tmdb_id: null, year: null, poster_path: null, tmdb_type: null });
+    } else {
+      onPick(value.trim());
+    }
+    setFound({ query: '', results: [] });
     combobox.closeDropdown();
   };
 

@@ -1,13 +1,12 @@
 import { ActionIcon, Alert, CloseButton, Indicator, Loader, ScrollArea, SegmentedControl, TextInput } from '@mantine/core';
-import { IconAlertTriangle, IconEye, IconSearch, IconSettings } from '@tabler/icons-react';
-import { useState } from 'react';
+import { IconAlertTriangle, IconEye, IconListCheck, IconSearch, IconSettings } from '@tabler/icons-react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import type { ItemRow } from '@worker/snapshot';
 import AuthorCredit from '@shared/ui/AuthorCredit';
 import { matchesTitle } from '@domains/lists/lib/items';
 import { useAddItem } from '@domains/lists/model/useAddItem';
-import type { Channel, ItemStatus } from '@domains/lists/model/useChannel';
+import { streamerActions, type Channel, type ItemStatus } from '@domains/lists/model/useChannel';
 import AddItemBar from '@domains/lists/ui/AddItemBar';
 import PendingLotsModal from '@domains/integrations/pointauc/ui/PendingLotsModal';
 import PointaucImportModal from '@domains/integrations/pointauc/ui/PointaucImportModal';
@@ -21,12 +20,14 @@ type Tab = 'queue' | 'watched';
 interface AuthorPanelProps {
   /** The streamer's lists; owned by PanelPage so the viewer preview shows the same live data. */
   channel: Channel;
+  /** Why the latest Pointauc sync pass failed (null — it did not). */
+  syncError: string | null;
   /** Shows the panel the way viewers see it. */
   onViewAsViewer: () => void;
 }
 
 /** The streamer's panel on the channel page: the same lists, editable right there. Writes are checked by the Worker. */
-const AuthorPanel = ({ channel, onViewAsViewer }: AuthorPanelProps) => {
+const AuthorPanel = ({ channel, syncError, onViewAsViewer }: AuthorPanelProps) => {
   const { t } = useTranslation();
   const [activeListId, setActiveListId] = useState<number | null>(null);
   const [tab, setTab] = useState<Tab>('queue');
@@ -35,6 +36,7 @@ const AuthorPanel = ({ channel, onViewAsViewer }: AuthorPanelProps) => {
   const [isPendingOpened, setIsPendingOpened] = useState(false);
   const [isPointaucOpened, setIsPointaucOpened] = useState(false);
   const [ratingId, setRatingId] = useState<number | null>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
 
   const list = channel.lists?.find((candidate) => candidate.id === activeListId) ?? channel.lists?.[0];
   // A title typed in goes where the streamer is looking: the open tab.
@@ -55,17 +57,11 @@ const AuthorPanel = ({ channel, onViewAsViewer }: AuthorPanelProps) => {
   const total = (status: ItemStatus) => list.items.filter((item) => item.status === status).length;
   const isSearching = !!query.trim();
   const pendingLots = channel.pendingLots.filter((lot) => lot.list_id === list.id);
-
-  const actions = {
-    onWatched: (itemId: number) => {
-      channel.setStatus(itemId, 'watched');
-      setRatingId(itemId); // and ask how it was
-    },
-    onRequeue: (itemId: number) => channel.setStatus(itemId, 'queue'),
-    onDelete: channel.deleteItem,
-    onEdit: (item: ItemRow) => setEditingId(item.id),
-    onRate: (itemId: number, rating: number | null) => channel.editItem(itemId, { rating }),
-  };
+  // A search shows some of the queue: each row keeps its number in the whole queue.
+  const places = new Map(list.items.filter((item) => item.status === 'queue').map((item, index) => [item.id, index + 1]));
+  const actions = streamerActions(channel, setRatingId, setEditingId);
+  const syncList = channel.lists.find((candidate) => candidate.id === channel.pointaucListId);
+  const settingsLabel = syncError ? `${t('panel.pointaucSettings')} — ${syncError}` : t('panel.pointaucSettings');
 
   return (
     <div className="flex h-full flex-col gap-2 p-3">
@@ -79,21 +75,35 @@ const AuthorPanel = ({ channel, onViewAsViewer }: AuthorPanelProps) => {
           }}
         />
         <TextInput
+          ref={searchRef}
           className="ml-auto w-[76px] shrink-0"
           size="xs"
           leftSection={<IconSearch size={14} />}
-          rightSection={isSearching && <CloseButton size="sm" aria-label={t('panel.clear')} onClick={() => setQuery('')} />}
+          rightSectionPointerEvents="all"
+          rightSection={
+            isSearching && (
+              <CloseButton
+                size="sm"
+                aria-label={t('panel.clear')}
+                onClick={() => {
+                  setQuery('');
+                  searchRef.current?.focus();
+                }}
+              />
+            )
+          }
           placeholder={t('config.search')}
+          aria-label={t('config.search')}
           value={query}
           onChange={(event) => setQuery(event.currentTarget.value)}
         />
-        {/* The dot is a hint while Pointauc is not connected yet. */}
-        <Indicator size={9} offset={4} color="var(--accent)" disabled={channel.isPointaucConnected}>
+        {/* The dot: Pointauc is not connected yet, or the sync cannot reach it. */}
+        <Indicator size={9} offset={4} color="var(--accent)" disabled={channel.isPointaucConnected && !syncError}>
           <ActionIcon
             variant="default"
             size="lg"
-            aria-label={t('panel.pointaucSettings')}
-            title={t('panel.pointaucSettings')}
+            aria-label={settingsLabel}
+            title={settingsLabel}
             onClick={() => setIsPointaucOpened(true)}
           >
             <IconSettings size={16} />
@@ -117,26 +127,31 @@ const AuthorPanel = ({ channel, onViewAsViewer }: AuthorPanelProps) => {
         </Alert>
       )}
 
-      {pendingLots.length > 0 && (
-        <button
-          type="button"
-          className="chip chip-new self-start"
-          onClick={() => setIsPendingOpened(true)}
-        >
-          {t('pending.banner', { count: pendingLots.length })}
-        </button>
-      )}
-
-      <SegmentedControl
-        size="xs"
-        fullWidth
-        value={tab}
-        onChange={(value) => setTab(value as Tab)}
-        data={[
-          { value: 'queue', label: `${t('columns.queue')} ${total('queue')}` },
-          { value: 'watched', label: `${t(`columns.${list.kind}.watched`)} ${total('watched')}` },
-        ]}
-      />
+      {/* Lots to look at sit next to the tabs, so the 300 px panel keeps its room for the list. */}
+      <div className="flex items-center gap-1.5">
+        <SegmentedControl
+          className="min-w-0 flex-1"
+          size="xs"
+          value={tab}
+          onChange={(value) => setTab(value as Tab)}
+          data={[
+            { value: 'queue', label: `${t('columns.queue')} ${total('queue')}` },
+            { value: 'watched', label: `${t(`columns.${list.kind}.watched`)} ${total('watched')}` },
+          ]}
+        />
+        {pendingLots.length > 0 && (
+          <button
+            type="button"
+            className="chip chip-new inline-flex shrink-0 items-center gap-1"
+            aria-label={t('pending.banner', { count: pendingLots.length })}
+            title={t('pending.banner', { count: pendingLots.length })}
+            onClick={() => setIsPendingOpened(true)}
+          >
+            <IconListCheck size={12} />
+            {pendingLots.length}
+          </button>
+        )}
+      </div>
 
       <ScrollArea className="glass-soft min-h-0 flex-1 rounded-[18px]" p={6}>
         {tab === 'queue' ? (
@@ -145,6 +160,7 @@ const AuthorPanel = ({ channel, onViewAsViewer }: AuthorPanelProps) => {
             items={queue}
             isCompact
             emptyText={t(isSearching ? 'config.nothingFound' : 'config.emptyQueue')}
+            places={places}
             onReorder={(ids) => channel.reorderQueue(list.id, ids)}
             {...actions}
           />
@@ -180,6 +196,9 @@ const AuthorPanel = ({ channel, onViewAsViewer }: AuthorPanelProps) => {
         onConnect={channel.connectPointauc}
         onDisconnect={channel.disconnectPointauc}
         syncListId={channel.pointaucListId}
+        syncListTitle={syncList?.title ?? null}
+        syncError={syncError}
+        saveError={channel.saveError}
         onToggleSync={(isOn) => channel.setPointaucSync(isOn ? list.id : null)}
         onImport={async (lotIds, status) => !!(await channel.importLots(list.id, lotIds, status))}
       />

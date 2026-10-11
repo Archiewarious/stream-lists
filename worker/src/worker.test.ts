@@ -151,6 +151,11 @@ describe('Pointauc', () => {
     expect(toPointaucLots([{ id: 'x', name: 'old array shape' }])).toEqual([]);
   });
 
+  it('cuts a long lot name at 200 characters, not in the middle of an emoji', () => {
+    const [lot] = toPointaucLots({ lots: [{ id: 'a', name: `${'a'.repeat(199)}😀😀`, amount: 1 }] });
+    expect(lot.name).toBe(`${'a'.repeat(199)}😀`);
+  });
+
   it('encrypts the token so only the key opens it', async () => {
     const key = btoa('k'.repeat(32));
     const stored = await encryptText('pointauc-token', key);

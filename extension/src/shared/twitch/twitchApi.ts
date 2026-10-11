@@ -1,4 +1,5 @@
 import { createDevTwitchApi } from '@shared/twitch/devTwitchApi';
+import { fanOut } from '@shared/twitch/fanOut';
 
 export interface TwitchAuth {
   token: string;
@@ -8,35 +9,20 @@ export interface TwitchAuth {
 /** The subset of Twitch.ext the extension uses — so it can be swapped for a local imitation. */
 export interface TwitchApi {
   workerUrl: string;
-  onAuthorized: (callback: (auth: TwitchAuth) => void) => void;
+  /** Returns an unsubscribe function, like the two below. */
+  onAuthorized: (callback: (auth: TwitchAuth) => void) => () => void;
   getBroadcasterConfig: () => string | undefined;
-  onConfigChanged: (callback: () => void) => void;
-  /** Returns an unsubscribe function. */
+  onConfigChanged: (callback: () => void) => () => void;
   listenBroadcast: (callback: (content: string) => void) => () => void;
-  /** Dev only: the local Worker can't reach Twitch, so the config page hands the snapshot to the imitation itself. */
+  /** Dev only: the local Worker can't reach Twitch, so useChannel (settings window, streamer's panel) hands the snapshot to the imitation itself. */
   mirrorSnapshot?: (content: string) => void;
 }
 
-// Twitch.ext.onAuthorized keeps only the LAST callback, so every listener of ours goes through one subscription
-// (a second `Twitch.ext.onAuthorized` call silently disconnects the first — the requests to the Worker never left).
-const authListeners = new Set<(auth: TwitchAuth) => void>();
-let lastAuth: TwitchAuth | undefined;
-let isAuthSubscribed = false;
-
 const realTwitchApi: TwitchApi = {
   workerUrl: 'https://stream-lists.begidan32.workers.dev',
-  onAuthorized: (callback) => {
-    authListeners.add(callback);
-    if (lastAuth) callback(lastAuth);
-    if (isAuthSubscribed) return;
-    isAuthSubscribed = true;
-    Twitch.ext.onAuthorized(({ token, channelId }) => {
-      lastAuth = { token, channelId };
-      authListeners.forEach((listener) => listener(lastAuth!));
-    });
-  },
+  onAuthorized: fanOut<TwitchAuth>((emit) => Twitch.ext.onAuthorized(({ token, channelId }) => emit({ token, channelId }))),
   getBroadcasterConfig: () => Twitch.ext.configuration.broadcaster?.content,
-  onConfigChanged: (callback) => Twitch.ext.configuration.onChanged(callback),
+  onConfigChanged: fanOut<void>((emit) => Twitch.ext.configuration.onChanged(() => emit())),
   listenBroadcast: (callback) => {
     const handleMessage = (_target: string, _contentType: string, message: string) => callback(message);
     Twitch.ext.listen('broadcast', handleMessage);

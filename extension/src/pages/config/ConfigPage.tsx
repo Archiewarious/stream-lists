@@ -1,14 +1,14 @@
 import { ActionIcon, Button, Center, Loader, Modal, Text, Title } from '@mantine/core';
 import { IconChartPie, IconDots, IconTrash } from '@tabler/icons-react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import type { ItemRow } from '@worker/snapshot';
 import AppearanceView from '@domains/appearance/ui/AppearanceView';
 import PendingLotsModal from '@domains/integrations/pointauc/ui/PendingLotsModal';
 import PointaucImportModal from '@domains/integrations/pointauc/ui/PointaucImportModal';
 import { useAddItem } from '@domains/lists/model/useAddItem';
-import { useChannel, type ItemStatus, type ListKind } from '@domains/lists/model/useChannel';
+import { streamerActions, useChannel, type AddResult, type ItemStatus, type ListKind } from '@domains/lists/model/useChannel';
+import { useBroadcastReload } from '@domains/lists/model/useLiveSync';
 import AddItemBar from '@domains/lists/ui/AddItemBar';
 import ItemEditModal from '@domains/lists/ui/ItemEditModal';
 import RatePromptModal from '@domains/lists/ui/RatePromptModal';
@@ -23,6 +23,7 @@ const NOTICE_MS = 6000;
 const ConfigPage = () => {
   const { t } = useTranslation();
   const channel = useChannel();
+  useBroadcastReload(channel); // edits made in the panel show up here too
   const [activeListId, setActiveListId] = useState<number | null>(null);
   const [isAppearanceOpened, setIsAppearanceOpened] = useState(false);
   const [isSettingsOpened, setIsSettingsOpened] = useState(false);
@@ -32,6 +33,16 @@ const ConfigPage = () => {
   const [isPendingOpened, setIsPendingOpened] = useState(false);
   const [ratingId, setRatingId] = useState<number | null>(null);
   const addItem = useAddItem(channel, channel.lists?.find((candidate) => candidate.id === activeListId) ?? channel.lists?.[0]);
+  const noticeTimer = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(noticeTimer.current), []);
+
+  /** "Added N, skipped M" after a bulk add or an import, for a few seconds (a newer one replaces it). */
+  const showResult = (result: AddResult) => {
+    const unchecked = result.unchecked ? ` ${t('config.bulkUnchecked', { count: result.unchecked })}` : '';
+    setNotice(t('config.bulkResult', { added: result.added.length, skipped: result.skipped }) + unchecked);
+    window.clearTimeout(noticeTimer.current);
+    noticeTimer.current = window.setTimeout(() => setNotice(null), NOTICE_MS);
+  };
 
   const selectList = (listId: number) => {
     setActiveListId(listId);
@@ -52,7 +63,7 @@ const ConfigPage = () => {
             <Button onClick={channel.reload}>{t('config.retry')}</Button>
           </div>
         ) : (
-          <Loader color="var(--primary-hi)" />
+          <Loader color="var(--primary-hi)" role="status" aria-label={t('config.loading')} />
         )}
       </Center>
     );
@@ -77,31 +88,19 @@ const ConfigPage = () => {
   const queue = list.items.filter((item) => item.status === 'queue');
   const watched = list.items.filter((item) => item.status === 'watched');
 
-  const itemActions = {
-    onWatched: (itemId: number) => {
-      channel.setStatus(itemId, 'watched');
-      setRatingId(itemId); // and ask how it was
-    },
-    onRequeue: (itemId: number) => channel.setStatus(itemId, 'queue'),
-    onDelete: channel.deleteItem,
-    onEdit: (item: ItemRow) => setEditingId(item.id),
-    onRate: (itemId: number, rating: number | null) => channel.editItem(itemId, { rating }),
-  };
+  const itemActions = streamerActions(channel, setRatingId, setEditingId);
+  const syncList = channel.lists.find((candidate) => candidate.id === channel.pointaucListId);
 
   const importLots = async (lotIds: string[], status: ItemStatus) => {
     const result = await channel.importLots(list.id, lotIds, status);
-    if (!result) return false;
-    setNotice(t('config.bulkResult', { added: result.added.length, skipped: result.skipped }));
-    setTimeout(() => setNotice(null), NOTICE_MS);
-    return true;
+    if (result) showResult(result);
+    return !!result;
   };
 
-  const addBulk = async (titles: string[], status: ItemStatus, source: ItemRow['source'] = 'manual') => {
-    const result = await channel.addBulk(list.id, titles, status, source);
-    if (!result) return false;
-    setNotice(t('config.bulkResult', { added: result.added.length, skipped: result.skipped }));
-    setTimeout(() => setNotice(null), NOTICE_MS);
-    return true;
+  const addBulk = async (titles: string[], status: ItemStatus) => {
+    const result = await channel.addBulk(list.id, titles, status);
+    if (result) showResult(result);
+    return !!result;
   };
 
   return (
@@ -200,6 +199,8 @@ const ConfigPage = () => {
         onConnect={channel.connectPointauc}
         onDisconnect={channel.disconnectPointauc}
         syncListId={channel.pointaucListId}
+        syncListTitle={syncList?.title ?? null}
+        saveError={channel.saveError}
         onToggleSync={(isOn) => channel.setPointaucSync(isOn ? list.id : null)}
         onImport={importLots}
       />
