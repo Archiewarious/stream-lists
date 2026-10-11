@@ -4,10 +4,11 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
+    "predeploy": "npm run typecheck && npm test",
     "deploy": "wrangler d1 migrations apply stream-lists --remote && wrangler deploy",
     "test": "vitest run",
     "typecheck": "wrangler types --include-env=false && tsc --noEmit",
-    "dev:ext": "wrangler dev --ip 127.0.0.1 --port 8787 --var EXTENSION_SECRET:ZGV2LXNlY3JldA== --var TOKEN_ENCRYPTION_KEY:ZGV2LXRva2VuLWtleS0wMTIzNDU2Nzg5YWJjZGVmMDE="
+    "dev:ext": "wrangler d1 migrations apply stream-lists --local && wrangler dev --ip 127.0.0.1 --port 8787 --var EXTENSION_SECRET:ZGV2LXNlY3JldA== --var TOKEN_ENCRYPTION_KEY:ZGV2LXRva2VuLWtleS0wMTIzNDU2Nzg5YWJjZGVmMDE="
   },
   "devDependencies": {
     "typescript": "5.9",
