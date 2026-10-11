@@ -20,13 +20,27 @@ interface MovieSearchInputProps {
   onChange: (value: string) => void;
   onPick: (title: string, movie?: MovieFields) => void;
   error?: string | null;
+  /** Text of the last option, which keeps the typed title without a poster. */
+  plainLabelKey?: string;
+  autoFocus?: boolean;
+  size?: 'sm' | 'md';
 }
 
 /**
  * Title input with TMDB suggestions: picking one saves the poster and year. Enter takes the highlighted
  * suggestion; with none highlighted the surrounding form submits the plain title.
  */
-const MovieSearchInput = ({ withSuggestions, placeholder, value, onChange, onPick, error }: MovieSearchInputProps) => {
+const MovieSearchInput = ({
+  withSuggestions,
+  placeholder,
+  value,
+  onChange,
+  onPick,
+  error,
+  plainLabelKey = 'movies.withoutPoster',
+  autoFocus,
+  size = 'md',
+}: MovieSearchInputProps) => {
   const { t, i18n } = useTranslation();
   const combobox = useCombobox({ onDropdownClose: () => combobox.resetSelectedOption() });
   const [debouncedValue] = useDebouncedValue(value.trim(), 300);
@@ -53,7 +67,12 @@ const MovieSearchInput = ({ withSuggestions, placeholder, value, onChange, onPic
 
   const pick = (optionValue: string) => {
     const result = results[Number(optionValue)];
-    if (result) onPick(result.title, { tmdb_id: result.tmdb_id, year: result.year, poster_path: result.poster_path });
+    if (result) onPick(result.title, {
+        tmdb_id: result.tmdb_id,
+        year: result.year,
+        poster_path: result.poster_path,
+        tmdb_type: result.type,
+      });
     else onPick(value.trim());
     setResults([]);
     combobox.closeDropdown();
@@ -66,10 +85,11 @@ const MovieSearchInput = ({ withSuggestions, placeholder, value, onChange, onPic
       <Combobox.Target>
         <TextInput
           className="flex-1"
-          size="md"
+          size={size}
           leftSection={withSuggestions ? <IconSearch size={18} /> : <IconPlus size={18} />}
           placeholder={placeholder}
           maxLength={200}
+          autoFocus={autoFocus}
           error={error}
           value={value}
           onChange={(event) => {
@@ -98,7 +118,7 @@ const MovieSearchInput = ({ withSuggestions, placeholder, value, onChange, onPic
             <span className="flex w-[34px] justify-center text-fg-3">
               <IconPlus size={18} />
             </span>
-            {t('movies.withoutPoster', { title: value.trim() })}
+            {t(plainLabelKey, { title: value.trim() })}
           </Combobox.Option>
         </Combobox.Options>
         <Combobox.Footer className="!border-0 !px-2.5 !pt-1 !pb-0.5 text-[11px] text-fg-3">{t('movies.tmdb')}</Combobox.Footer>

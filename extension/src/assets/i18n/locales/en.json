@@ -39,7 +39,10 @@
     "clear": "Clear",
     "found": "Found {{count}} of {{total}}",
     "inQueue": "In queue · {{position}}",
-    "more": "{{count}} more"
+    "more": "{{count}} more",
+    "noListsAuthor": "No lists yet. Create the first one in the extension settings.",
+    "viewAsViewer": "What viewers see",
+    "backToEdit": "Back to editing"
   },
   "config": {
     "yourLists": "Your lists",
@@ -72,7 +75,8 @@
     "loadFailed": "Couldn't load the lists: {{error}}",
     "retry": "Retry",
     "duplicateQueue": "Already in the queue · {{position}}",
-    "duplicateWatched": "Already there: {{status}}"
+    "duplicateWatched": "Already there: {{status}}",
+    "addShort": "Add to the queue"
   },
   "movies": {
     "searchPlaceholder": "Find a movie — poster and year come along",
@@ -133,5 +137,18 @@
     "disconnect": "Disconnect Pointauc",
     "empty": "No lots in the auction yet",
     "noRepeats": "Watched and queued titles are not added twice"
+  },
+  "rating": {
+    "set": "Rate",
+    "label": "Rating"
+  },
+  "edit": {
+    "open": "Edit",
+    "title": "Edit",
+    "placeholder": "Title — pick the movie from the suggestions",
+    "keepTitle": "Keep \"{{title}}\" and look for a poster",
+    "save": "Save",
+    "noPoster": "No poster. Fix the title and pick the right movie from the suggestions.",
+    "hasPoster": "You can fix the title or pick another movie."
   }
 }

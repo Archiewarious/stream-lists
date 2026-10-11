@@ -1,4 +1,4 @@
-import { Button, Group, Modal, Text, Textarea } from '@mantine/core';
+import { ActionIcon, Button, Group, Modal, Text, Textarea } from '@mantine/core';
 import { IconCheck, IconList, IconPlus } from '@tabler/icons-react';
 import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -13,10 +13,12 @@ interface AddItemBarProps {
   onAdd: (title: string, movie?: MovieFields) => string | null;
   /** Resolves false when saving failed — the pasted text stays. */
   onBulk: (titles: string[], status: ItemStatus) => Promise<boolean>;
+  /** Narrow panel: the bulk button is only an icon and its dialog fills the panel. */
+  isCompact?: boolean;
 }
 
 /** One title → queue; "Списком" pastes many at once (to the queue or straight to watched). */
-const AddItemBar = ({ kind, onAdd, onBulk }: AddItemBarProps) => {
+const AddItemBar = ({ kind, onAdd, onBulk, isCompact }: AddItemBarProps) => {
   const { t } = useTranslation();
   const [title, setTitle] = useState('');
   const [addError, setAddError] = useState<string | null>(null);
@@ -52,7 +54,8 @@ const AddItemBar = ({ kind, onAdd, onBulk }: AddItemBarProps) => {
     <form onSubmit={handleSubmit} className="flex items-start gap-2.5">
       <MovieSearchInput
         withSuggestions={kind === 'movies'}
-        placeholder={t(kind === 'movies' ? 'movies.searchPlaceholder' : 'config.addPlaceholder')}
+        size={isCompact ? 'sm' : 'md'}
+        placeholder={t(isCompact ? 'config.addShort' : kind === 'movies' ? 'movies.searchPlaceholder' : 'config.addPlaceholder')}
         value={title}
         onChange={(value) => {
           setTitle(value);
@@ -61,15 +64,28 @@ const AddItemBar = ({ kind, onAdd, onBulk }: AddItemBarProps) => {
         onPick={add}
         error={addError}
       />
-      <Button variant="default" size="md" leftSection={<IconList size={18} />} onClick={() => setIsBulkOpened(true)}>
-        {t('config.bulk')}
-      </Button>
+      {isCompact ? (
+        <ActionIcon
+          variant="default"
+          size="input-sm"
+          aria-label={t('config.bulk')}
+          title={t('config.bulk')}
+          onClick={() => setIsBulkOpened(true)}
+        >
+          <IconList size={18} />
+        </ActionIcon>
+      ) : (
+        <Button variant="default" size="md" leftSection={<IconList size={18} />} onClick={() => setIsBulkOpened(true)}>
+          {t('config.bulk')}
+        </Button>
+      )}
 
       <Modal
         opened={isBulkOpened}
         onClose={() => setIsBulkOpened(false)}
         title={<span className="script text-4xl">{t('config.bulkTitle')}</span>}
         size="lg"
+        fullScreen={isCompact}
         centered
       >
         <Text size="sm" c="dimmed" mb="sm">

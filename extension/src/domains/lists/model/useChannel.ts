@@ -8,7 +8,8 @@ import { twitchApi } from '@shared/twitch/twitchApi';
 
 export type ListKind = ListRow['kind'];
 export type ItemStatus = ItemRow['status'];
-export type MovieFields = Partial<Pick<ItemRow, 'year' | 'tmdb_id' | 'poster_path'>>;
+export type MovieFields = Partial<Pick<ItemRow, 'year' | 'tmdb_id' | 'poster_path' | 'tmdb_type'>>;
+export type EditableItemFields = MovieFields & Partial<Pick<ItemRow, 'title' | 'rating'>>;
 
 type ListsUpdate = (lists: ChannelList[]) => ChannelList[];
 
@@ -167,6 +168,19 @@ export const useChannel = () => {
             const rest = items.filter((candidate) => candidate.id !== itemId);
             return status === 'watched' ? [moved, ...rest] : [...rest, moved];
           }),
+      ),
+
+    /**
+     * Title, rating or the TMDB details of an item. A new title without TMDB fields makes the Worker look the
+     * title up again, so the reload after the request brings the poster.
+     */
+    editItem: (itemId: number, fields: EditableItemFields) =>
+      run(
+        () => callWorker('PATCH', `/api/items/${itemId}`, fields),
+        (current) =>
+          updateItem(current, itemId, (items) =>
+            items.map((candidate) => (candidate.id === itemId ? { ...candidate, ...fields } : candidate)),
+          ),
       ),
 
     deleteItem: (itemId: number) =>

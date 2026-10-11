@@ -3,13 +3,13 @@ import { IconChartPie, IconDots, IconTrash } from '@tabler/icons-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { normalizeTitle } from '@worker/pointauc';
 import type { ItemRow } from '@worker/snapshot';
-import { formatDay } from '@domains/lists/lib/items';
 import AppearanceView from '@domains/appearance/ui/AppearanceView';
 import PointaucImportModal from '@domains/integrations/pointauc/ui/PointaucImportModal';
-import { useChannel, type ItemStatus, type ListKind, type MovieFields } from '@domains/lists/model/useChannel';
+import { useAddItem } from '@domains/lists/model/useAddItem';
+import { useChannel, type ItemStatus, type ListKind } from '@domains/lists/model/useChannel';
 import AddItemBar from '@domains/lists/ui/AddItemBar';
+import ItemEditModal from '@domains/lists/ui/ItemEditModal';
 import ListForm from '@domains/lists/ui/ListForm';
 import ListsSidebar from '@domains/lists/ui/ListsSidebar';
 import QueueColumn from '@domains/lists/ui/QueueColumn';
@@ -19,13 +19,15 @@ import ConfirmPopover from '@shared/ui/ConfirmPopover';
 const NOTICE_MS = 6000;
 
 const ConfigPage = () => {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const channel = useChannel();
   const [activeListId, setActiveListId] = useState<number | null>(null);
   const [isAppearanceOpened, setIsAppearanceOpened] = useState(false);
   const [isSettingsOpened, setIsSettingsOpened] = useState(false);
   const [isPointaucOpened, setIsPointaucOpened] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const addItem = useAddItem(channel, channel.lists?.find((candidate) => candidate.id === activeListId) ?? channel.lists?.[0]);
 
   const selectList = (listId: number) => {
     setActiveListId(listId);
@@ -70,16 +72,12 @@ const ConfigPage = () => {
   const queue = list.items.filter((item) => item.status === 'queue');
   const watched = list.items.filter((item) => item.status === 'watched');
 
-  /** Adds to the queue; a title already in the list is not added again — returns where it is instead. */
-  const addItem = (title: string, movie?: MovieFields) => {
-    const existing = list.items.find((item) => normalizeTitle(item.title) === normalizeTitle(title));
-    if (existing?.status === 'queue') return t('config.duplicateQueue', { position: queue.indexOf(existing) + 1 });
-    if (existing) {
-      const date = formatDay(existing.watched_at ?? 0, i18n.language);
-      return t('config.duplicateWatched', { status: t(`columns.${list.kind}.seenChip`, { date }) });
-    }
-    channel.addItem(list.id, title, 'queue', movie);
-    return null;
+  const itemActions = {
+    onWatched: (itemId: number) => channel.setStatus(itemId, 'watched'),
+    onRequeue: (itemId: number) => channel.setStatus(itemId, 'queue'),
+    onDelete: channel.deleteItem,
+    onEdit: (item: ItemRow) => setEditingId(item.id),
+    onRate: (itemId: number, rating: number | null) => channel.editItem(itemId, { rating }),
   };
 
   const importLots = async (lotIds: string[], status: ItemStatus) => {
@@ -149,20 +147,21 @@ const ConfigPage = () => {
               <QueueColumn
                 kind={list.kind}
                 items={queue}
-                onWatched={(itemId) => channel.setStatus(itemId, 'watched')}
-                onDelete={channel.deleteItem}
                 onReorder={(ids) => channel.reorderQueue(list.id, ids)}
+                {...itemActions}
               />
-              <WatchedColumn
-                kind={list.kind}
-                items={watched}
-                onRequeue={(itemId) => channel.setStatus(itemId, 'queue')}
-                onDelete={channel.deleteItem}
-              />
+              <WatchedColumn kind={list.kind} items={watched} {...itemActions} />
             </div>
           </>
         )}
       </main>
+
+      <ItemEditModal
+        item={list.items.find((item) => item.id === editingId) ?? null}
+        kind={list.kind}
+        onClose={() => setEditingId(null)}
+        onSave={channel.editItem}
+      />
 
       <PointaucImportModal
         opened={isPointaucOpened}

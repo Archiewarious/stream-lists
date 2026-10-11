@@ -19,7 +19,8 @@ export const createDevTwitchApi = (): TwitchApi => {
     workerUrl: 'http://127.0.0.1:8787',
     onAuthorized: async (callback) => {
       const exp = Math.floor(Date.now() / 1000) + 24 * 60 * 60;
-      const token = await signJwt({ exp, channel_id: DEV_CHANNEL_ID, role: 'broadcaster' }, DEV_SECRET);
+      const role = new URLSearchParams(window.location.search).get('role') ?? 'broadcaster'; // ?role=viewer
+      const token = await signJwt({ exp, channel_id: DEV_CHANNEL_ID, role }, DEV_SECRET);
       callback({ token, channelId: DEV_CHANNEL_ID });
     },
     getBroadcasterConfig: () => localStorage.getItem(STORAGE_KEY) ?? undefined,
