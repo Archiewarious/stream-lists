@@ -94,7 +94,6 @@ const AuthorPanel = ({ channel, onViewAsViewer }: AuthorPanelProps) => {
         isCompact
         target={tab}
         onAdd={addItem}
-        onBulk={async (titles, status) => !!(await channel.addBulk(list.id, titles, status))}
       />
 
       {channel.saveError && (
