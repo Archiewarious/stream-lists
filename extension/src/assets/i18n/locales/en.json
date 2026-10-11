@@ -42,6 +42,7 @@
     "more": "{{count}} more",
     "noListsAuthor": "No lists yet. Create the first one in the extension settings.",
     "viewAsViewer": "What viewers see",
+    "pointaucSettings": "Pointauc: connect and lots",
     "backToEdit": "Back to editing"
   },
   "config": {

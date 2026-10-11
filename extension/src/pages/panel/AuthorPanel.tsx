@@ -1,5 +1,5 @@
-import { ActionIcon, Alert, CloseButton, Loader, ScrollArea, SegmentedControl, TextInput } from '@mantine/core';
-import { IconAlertTriangle, IconEye, IconSearch } from '@tabler/icons-react';
+import { ActionIcon, Alert, CloseButton, Indicator, Loader, ScrollArea, SegmentedControl, TextInput } from '@mantine/core';
+import { IconAlertTriangle, IconEye, IconSearch, IconSettings } from '@tabler/icons-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -9,6 +9,7 @@ import { useAddItem } from '@domains/lists/model/useAddItem';
 import type { Channel, ItemStatus } from '@domains/lists/model/useChannel';
 import AddItemBar from '@domains/lists/ui/AddItemBar';
 import PendingLotsModal from '@domains/integrations/pointauc/ui/PendingLotsModal';
+import PointaucImportModal from '@domains/integrations/pointauc/ui/PointaucImportModal';
 import ItemEditModal from '@domains/lists/ui/ItemEditModal';
 import RatePromptModal from '@domains/lists/ui/RatePromptModal';
 import { QueueList, WatchedList } from '@domains/lists/ui/ItemLists';
@@ -31,6 +32,7 @@ const AuthorPanel = ({ channel, onViewAsViewer }: AuthorPanelProps) => {
   const [query, setQuery] = useState('');
   const [editingId, setEditingId] = useState<number | null>(null);
   const [isPendingOpened, setIsPendingOpened] = useState(false);
+  const [isPointaucOpened, setIsPointaucOpened] = useState(false);
   const [ratingId, setRatingId] = useState<number | null>(null);
 
   const list = channel.lists?.find((candidate) => candidate.id === activeListId) ?? channel.lists?.[0];
@@ -66,7 +68,7 @@ const AuthorPanel = ({ channel, onViewAsViewer }: AuthorPanelProps) => {
 
   return (
     <div className="flex h-full flex-col gap-2 p-3">
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5">
         <ListSwitcher
           lists={channel.lists}
           active={list}
@@ -76,7 +78,7 @@ const AuthorPanel = ({ channel, onViewAsViewer }: AuthorPanelProps) => {
           }}
         />
         <TextInput
-          className="ml-auto w-[112px] shrink-0"
+          className="ml-auto w-[76px] shrink-0"
           size="xs"
           leftSection={<IconSearch size={14} />}
           rightSection={isSearching && <CloseButton size="sm" aria-label={t('panel.clear')} onClick={() => setQuery('')} />}
@@ -84,6 +86,18 @@ const AuthorPanel = ({ channel, onViewAsViewer }: AuthorPanelProps) => {
           value={query}
           onChange={(event) => setQuery(event.currentTarget.value)}
         />
+        {/* The dot is a hint while Pointauc is not connected yet. */}
+        <Indicator size={9} offset={4} color="var(--accent)" disabled={channel.isPointaucConnected}>
+          <ActionIcon
+            variant="default"
+            size="lg"
+            aria-label={t('panel.pointaucSettings')}
+            title={t('panel.pointaucSettings')}
+            onClick={() => setIsPointaucOpened(true)}
+          >
+            <IconSettings size={16} />
+          </ActionIcon>
+        </Indicator>
         <ActionIcon variant="default" size="lg" aria-label={t('panel.viewAsViewer')} title={t('panel.viewAsViewer')} onClick={onViewAsViewer}>
           <IconEye size={16} />
         </ActionIcon>
@@ -151,6 +165,20 @@ const AuthorPanel = ({ channel, onViewAsViewer }: AuthorPanelProps) => {
         isFullScreen
         onAccept={channel.acceptPending}
         onDismiss={channel.dismissPending}
+      />
+
+      <PointaucImportModal
+        opened={isPointaucOpened}
+        onClose={() => setIsPointaucOpened(false)}
+        listId={list.id}
+        kind={list.kind}
+        isFullScreen
+        isConnected={channel.isPointaucConnected}
+        onConnect={channel.connectPointauc}
+        onDisconnect={channel.disconnectPointauc}
+        syncListId={channel.pointaucListId}
+        onToggleSync={(isOn) => channel.setPointaucSync(isOn ? list.id : null)}
+        onImport={async (lotIds, status) => !!(await channel.importLots(list.id, lotIds, status))}
       />
 
       <RatePromptModal

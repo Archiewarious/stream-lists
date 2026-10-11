@@ -22,6 +22,7 @@ interface PointaucImportModalProps {
   onToggleSync: (isOn: boolean) => Promise<boolean>;
   /** Resolves false when saving failed — the dialog and the selection stay. */
   onImport: (lotIds: string[], status: ItemStatus) => Promise<boolean>;
+  isFullScreen?: boolean;
 }
 
 const ConnectForm = ({ onConnect }: Pick<PointaucImportModalProps, 'onConnect'>) => {
@@ -72,7 +73,7 @@ const ConnectForm = ({ onConnect }: Pick<PointaucImportModalProps, 'onConnect'>)
 
 /** Lots of the current Pointauc auction → this list. New lots are preselected; known ones are shown with their status. */
 const PointaucImportModal = (props: PointaucImportModalProps) => {
-  const { opened, onClose, listId, kind, isConnected, onConnect, onDisconnect, onImport, syncListId, onToggleSync } = props;
+  const { opened, onClose, listId, kind, isConnected, onConnect, onDisconnect, onImport, syncListId, onToggleSync, isFullScreen } = props;
   const { t, i18n } = useTranslation();
   const [lots, setLots] = useState<ImportLot[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -135,6 +136,7 @@ const PointaucImportModal = (props: PointaucImportModalProps) => {
     <Modal
       opened={opened}
       onClose={onClose}
+      fullScreen={isFullScreen}
       size={620}
       centered
       title={
@@ -189,14 +191,27 @@ const PointaucImportModal = (props: PointaucImportModalProps) => {
                 }`}
               >
                 <Checkbox checked={selected.has(lot.id)} onChange={() => toggle(lot.id)} />
-                <span className="min-w-0 flex-1 truncate">{lot.name}</span>
-                {chip(lot)}
-                <span className="w-14 text-right text-xs text-fg-2 tabular-nums">{lot.amount.toLocaleString(i18n.language)}</span>
+                {isFullScreen ? (
+                  // The narrow panel: the chip and the bid go under the title instead of squeezing it.
+                  <span className="flex min-w-0 flex-1 flex-col items-start gap-1">
+                    <span className="max-w-full truncate">{lot.name}</span>
+                    <span className="flex items-center gap-2">
+                      {chip(lot)}
+                      <span className="text-xs text-fg-2 tabular-nums">{lot.amount.toLocaleString(i18n.language)}</span>
+                    </span>
+                  </span>
+                ) : (
+                  <>
+                    <span className="min-w-0 flex-1 truncate">{lot.name}</span>
+                    {chip(lot)}
+                    <span className="w-14 text-right text-xs text-fg-2 tabular-nums">{lot.amount.toLocaleString(i18n.language)}</span>
+                  </>
+                )}
               </label>
             ))}
           </ScrollArea.Autosize>
           <div className="mt-2 flex flex-wrap items-center gap-3 border-t border-white/10 pt-3.5">
-            <span className="min-w-0 flex-1 text-xs text-fg-2">{t('pointauc.noRepeats')}</span>
+            <span className={`min-w-0 flex-1 text-xs text-fg-2 ${isFullScreen ? 'basis-full' : ''}`}>{t('pointauc.noRepeats')}</span>
             <Button
               variant="default"
               leftSection={<IconCheck size={16} />}

@@ -42,6 +42,7 @@
     "more": "Ещё {{count}}",
     "noListsAuthor": "Списков пока нет. Создайте первый в настройках расширения.",
     "viewAsViewer": "Как видят зрители",
+    "pointaucSettings": "Pointauc: подключение и лоты",
     "backToEdit": "Вернуться к правке"
   },
   "config": {
