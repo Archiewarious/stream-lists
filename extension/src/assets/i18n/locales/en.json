@@ -76,7 +76,8 @@
     "retry": "Retry",
     "duplicateQueue": "Already in the queue · {{position}}",
     "duplicateWatched": "Already there: {{status}}",
-    "addShort": "Add to the queue"
+    "addShort": "Add to the queue",
+    "addShortWatched": "Add to watched"
   },
   "movies": {
     "searchPlaceholder": "Find a movie — poster and year come along",
@@ -143,7 +144,9 @@
   },
   "rating": {
     "set": "Rate",
-    "label": "Rating"
+    "label": "Rating",
+    "prompt": "How was it?",
+    "skip": "No rating"
   },
   "edit": {
     "open": "Edit",

@@ -11,6 +11,7 @@ import { useAddItem } from '@domains/lists/model/useAddItem';
 import { useChannel, type ItemStatus, type ListKind } from '@domains/lists/model/useChannel';
 import AddItemBar from '@domains/lists/ui/AddItemBar';
 import ItemEditModal from '@domains/lists/ui/ItemEditModal';
+import RatePromptModal from '@domains/lists/ui/RatePromptModal';
 import ListForm from '@domains/lists/ui/ListForm';
 import ListsSidebar from '@domains/lists/ui/ListsSidebar';
 import QueueColumn from '@domains/lists/ui/QueueColumn';
@@ -29,6 +30,7 @@ const ConfigPage = () => {
   const [notice, setNotice] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [isPendingOpened, setIsPendingOpened] = useState(false);
+  const [ratingId, setRatingId] = useState<number | null>(null);
   const addItem = useAddItem(channel, channel.lists?.find((candidate) => candidate.id === activeListId) ?? channel.lists?.[0]);
 
   const selectList = (listId: number) => {
@@ -76,7 +78,10 @@ const ConfigPage = () => {
   const watched = list.items.filter((item) => item.status === 'watched');
 
   const itemActions = {
-    onWatched: (itemId: number) => channel.setStatus(itemId, 'watched'),
+    onWatched: (itemId: number) => {
+      channel.setStatus(itemId, 'watched');
+      setRatingId(itemId); // and ask how it was
+    },
     onRequeue: (itemId: number) => channel.setStatus(itemId, 'queue'),
     onDelete: channel.deleteItem,
     onEdit: (item: ItemRow) => setEditingId(item.id),
@@ -171,6 +176,12 @@ const ConfigPage = () => {
         withSuggestions={list.kind === 'movies'}
         onAccept={channel.acceptPending}
         onDismiss={channel.dismissPending}
+      />
+
+      <RatePromptModal
+        item={list.items.find((item) => item.id === ratingId) ?? null}
+        onRate={(itemId, rating) => channel.editItem(itemId, { rating })}
+        onClose={() => setRatingId(null)}
       />
 
       <ItemEditModal

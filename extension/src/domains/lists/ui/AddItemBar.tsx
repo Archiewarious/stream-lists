@@ -15,10 +15,12 @@ interface AddItemBarProps {
   onBulk: (titles: string[], status: ItemStatus) => Promise<boolean>;
   /** Narrow panel: the bulk button is only an icon and its dialog fills the panel. */
   isCompact?: boolean;
+  /** Where a single title goes — the open tab; only changes the hint in the field. */
+  target?: 'queue' | 'watched';
 }
 
 /** One title → queue; "Списком" pastes many at once (to the queue or straight to watched). */
-const AddItemBar = ({ kind, onAdd, onBulk, isCompact }: AddItemBarProps) => {
+const AddItemBar = ({ kind, onAdd, onBulk, isCompact, target = 'queue' }: AddItemBarProps) => {
   const { t } = useTranslation();
   const [title, setTitle] = useState('');
   const [addError, setAddError] = useState<string | null>(null);
@@ -55,7 +57,15 @@ const AddItemBar = ({ kind, onAdd, onBulk, isCompact }: AddItemBarProps) => {
       <MovieSearchInput
         withSuggestions={kind === 'movies'}
         size={isCompact ? 'sm' : 'md'}
-        placeholder={t(isCompact ? 'config.addShort' : kind === 'movies' ? 'movies.searchPlaceholder' : 'config.addPlaceholder')}
+        placeholder={t(
+          isCompact
+            ? target === 'watched'
+              ? 'config.addShortWatched'
+              : 'config.addShort'
+            : kind === 'movies'
+              ? 'movies.searchPlaceholder'
+              : 'config.addPlaceholder',
+        )}
         value={title}
         onChange={(value) => {
           setTitle(value);

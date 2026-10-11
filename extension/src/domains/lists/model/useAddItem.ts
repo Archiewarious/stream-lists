@@ -1,15 +1,20 @@
 import { useTranslation } from 'react-i18next';
 
 import { normalizeTitle } from '@worker/pointauc';
-import type { ChannelList } from '@worker/snapshot';
+import type { ChannelList, ItemRow } from '@worker/snapshot';
 import { formatDay } from '@domains/lists/lib/items';
-import type { Channel, MovieFields } from '@domains/lists/model/useChannel';
+import type { Channel, ItemStatus, MovieFields } from '@domains/lists/model/useChannel';
 
 /**
- * Adds a title to the queue unless the list already has it. Returns a message about where it is when it was
- * not added, null when it was.
+ * Adds a title (to the queue or straight to "watched") unless the list already has it. Returns a message about
+ * where it is when it was not added, null when it was. `onAddedWatched` gets the new watched item (to ask for a rating).
  */
-export const useAddItem = (channel: Channel, list: ChannelList | undefined) => {
+export const useAddItem = (
+  channel: Channel,
+  list: ChannelList | undefined,
+  status: ItemStatus = 'queue',
+  onAddedWatched?: (item: ItemRow) => void,
+) => {
   const { t, i18n } = useTranslation();
 
   return (title: string, movie?: MovieFields): string | null => {
@@ -25,7 +30,9 @@ export const useAddItem = (channel: Channel, list: ChannelList | undefined) => {
       return t('config.duplicateWatched', { status: t(`columns.${list.kind}.seenChip`, { date }) });
     }
 
-    channel.addItem(list.id, title, 'queue', movie);
+    channel.addItem(list.id, title, status, movie).then((item) => {
+      if (item && status === 'watched') onAddedWatched?.(item);
+    });
     return null;
   };
 };

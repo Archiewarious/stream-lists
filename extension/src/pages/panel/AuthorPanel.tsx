@@ -10,6 +10,7 @@ import type { Channel, ItemStatus } from '@domains/lists/model/useChannel';
 import AddItemBar from '@domains/lists/ui/AddItemBar';
 import PendingLotsModal from '@domains/integrations/pointauc/ui/PendingLotsModal';
 import ItemEditModal from '@domains/lists/ui/ItemEditModal';
+import RatePromptModal from '@domains/lists/ui/RatePromptModal';
 import { QueueList, WatchedList } from '@domains/lists/ui/ItemLists';
 import ListSwitcher from '@domains/lists/ui/ListSwitcher';
 
@@ -30,9 +31,11 @@ const AuthorPanel = ({ channel, onViewAsViewer }: AuthorPanelProps) => {
   const [query, setQuery] = useState('');
   const [editingId, setEditingId] = useState<number | null>(null);
   const [isPendingOpened, setIsPendingOpened] = useState(false);
+  const [ratingId, setRatingId] = useState<number | null>(null);
 
   const list = channel.lists?.find((candidate) => candidate.id === activeListId) ?? channel.lists?.[0];
-  const addItem = useAddItem(channel, list);
+  // A title typed in goes where the streamer is looking: the open tab.
+  const addItem = useAddItem(channel, list, tab === 'watched' ? 'watched' : 'queue', (item) => setRatingId(item.id));
 
   if (!channel.lists) {
     return (
@@ -51,7 +54,10 @@ const AuthorPanel = ({ channel, onViewAsViewer }: AuthorPanelProps) => {
   const pendingLots = channel.pendingLots.filter((lot) => lot.list_id === list.id);
 
   const actions = {
-    onWatched: (itemId: number) => channel.setStatus(itemId, 'watched'),
+    onWatched: (itemId: number) => {
+      channel.setStatus(itemId, 'watched');
+      setRatingId(itemId); // and ask how it was
+    },
     onRequeue: (itemId: number) => channel.setStatus(itemId, 'queue'),
     onDelete: channel.deleteItem,
     onEdit: (item: ItemRow) => setEditingId(item.id),
@@ -86,6 +92,7 @@ const AuthorPanel = ({ channel, onViewAsViewer }: AuthorPanelProps) => {
       <AddItemBar
         kind={list.kind}
         isCompact
+        target={tab}
         onAdd={addItem}
         onBulk={async (titles, status) => !!(await channel.addBulk(list.id, titles, status))}
       />
@@ -145,6 +152,13 @@ const AuthorPanel = ({ channel, onViewAsViewer }: AuthorPanelProps) => {
         isFullScreen
         onAccept={channel.acceptPending}
         onDismiss={channel.dismissPending}
+      />
+
+      <RatePromptModal
+        item={list.items.find((item) => item.id === ratingId) ?? null}
+        isFullScreen
+        onRate={(itemId, rating) => channel.editItem(itemId, { rating })}
+        onClose={() => setRatingId(null)}
       />
 
       <ItemEditModal

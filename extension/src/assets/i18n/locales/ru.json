@@ -76,7 +76,8 @@
     "retry": "Повторить",
     "duplicateQueue": "Уже в очереди · {{position}}",
     "duplicateWatched": "Уже есть: {{status}}",
-    "addShort": "Добавить в очередь"
+    "addShort": "Добавить в очередь",
+    "addShortWatched": "Добавить в просмотренное"
   },
   "movies": {
     "searchPlaceholder": "Найти фильм — постер и год подтянутся сами",
@@ -143,7 +144,9 @@
   },
   "rating": {
     "set": "Оценить",
-    "label": "Оценка"
+    "label": "Оценка",
+    "prompt": "Какая оценка?",
+    "skip": "Без оценки"
   },
   "edit": {
     "open": "Править",
