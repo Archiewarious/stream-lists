@@ -2,6 +2,7 @@ import { useState } from 'react';
 
 import { fromChannelLists } from '@domains/lists/lib/panelLists';
 import { useChannel } from '@domains/lists/model/useChannel';
+import { useLiveSync } from '@domains/lists/model/useLiveSync';
 import { useRole } from '@shared/twitch/useRole';
 import AuthorPanel from '@pages/panel/AuthorPanel';
 import ViewerPanel from '@pages/panel/ViewerPanel';
@@ -9,6 +10,7 @@ import ViewerPanel from '@pages/panel/ViewerPanel';
 /** The streamer's side: one set of live data for editing and for the "as viewer" preview. */
 const AuthorSide = () => {
   const channel = useChannel();
+  useLiveSync(channel);
   const [isViewerPreview, setIsViewerPreview] = useState(false);
 
   if (isViewerPreview) {

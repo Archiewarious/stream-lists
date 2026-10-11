@@ -316,10 +316,10 @@ type PendingLot = { id: number; list_id: number; name: string; points: number | 
  * knows the title for sure (a movie list), otherwise it waits in "pending" for the streamer. A lot seen once is never
  * looked at again, so deleting or hiding it is final.
  */
-const autoSyncChannel = async (env: Env, channelId: string, listId: number, storedToken: string) => {
+const autoSyncChannel = async (env: Env, channelId: string, listId: number, storedToken: string): Promise<boolean> => {
   const db = env.DB;
   const list = await db.prepare('SELECT * FROM lists WHERE id = ? AND channel_id = ?').bind(listId, channelId).first<ListRow>();
-  if (!list) return;
+  if (!list) return false;
   const lots = await fetchPointaucLots(await decryptText(storedToken, getEncryptionKey(env)));
 
   const [items, pending] = await Promise.all([
@@ -348,7 +348,7 @@ const autoSyncChannel = async (env: Env, channelId: string, listId: number, stor
       : new Map<string, TmdbFields>();
   const toQueue = batch.filter((lot) => matched.has(lot.name));
   const toPending = batch.filter((lot) => !matched.has(lot.name));
-  if (items.results.length + toQueue.length > MAX_ITEMS_PER_LIST) return;
+  if (items.results.length + toQueue.length > MAX_ITEMS_PER_LIST) return false;
 
   const now = Date.now();
   const basePosition = (await db.prepare(`SELECT ${NEXT_QUEUE_POSITION} AS next`).bind(list.id).first<number>('next')) ?? 1;
@@ -367,10 +367,11 @@ const autoSyncChannel = async (env: Env, channelId: string, listId: number, stor
     }),
     ...toPending.map((lot) => park.bind(list.id, lot.id, lot.name, lot.amount, now)),
   ];
-  if (!statements.length) return;
+  if (!statements.length) return false;
 
   await db.batch(statements);
   await publishSnapshot(env, channelId);
+  return true;
 };
 
 /** Cron entry: every channel that switched the sync on. A failing channel (Pointauc tab closed) is just skipped. */
@@ -484,6 +485,15 @@ const handleApi = async (request: Request, env: Env, channelId: string, route: s
         console.error('First sync failed', error); // stays on: the next minute may find the Pointauc tab open
         return { ok: true, synced: false };
       }
+    }
+
+    case 'POST /api/pointauc/refresh': {
+      // A sync pass on demand: the streamer's open panel calls it every few seconds, so a lot added in Pointauc
+      // shows up almost at once instead of at the next cron tick. Publishing is done by the pass itself.
+      const settings = await loadSettings(db, channelId);
+      if (!settings?.pointauc_token || settings.pointauc_list_id === null) return { updated: 0, changed: false };
+      const changed = await autoSyncChannel(env, channelId, settings.pointauc_list_id, settings.pointauc_token);
+      return { updated: 0, changed }; // updated: 0 — no second snapshot publish from the generic handler
     }
 
     case 'POST /api/pending/:id/accept': {
