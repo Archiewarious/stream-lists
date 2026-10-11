@@ -3,7 +3,101 @@
 @import 'tailwindcss/theme.css' layer(theme);
 @import 'tailwindcss/preflight.css' layer(base);
 @import 'tailwindcss/utilities.css' layer(utilities);
-@import '@mantine/core/styles.layer.css';
+
+/* Mantine styles of the components the panel uses, in the order of @mantine/core/styles.layer.css (the later file
+   wins on equal specificity). A new Mantine component needs its file here. */
+@import '@mantine/core/styles/baseline.layer.css';
+@import '@mantine/core/styles/default-css-variables.layer.css';
+@import '@mantine/core/styles/global.layer.css';
+@import '@mantine/core/styles/ScrollArea.layer.css';
+@import '@mantine/core/styles/UnstyledButton.layer.css';
+@import '@mantine/core/styles/VisuallyHidden.layer.css';
+@import '@mantine/core/styles/Paper.layer.css';
+@import '@mantine/core/styles/Overlay.layer.css';
+@import '@mantine/core/styles/Popover.layer.css';
+@import '@mantine/core/styles/Loader.layer.css';
+@import '@mantine/core/styles/ActionIcon.layer.css';
+@import '@mantine/core/styles/CloseButton.layer.css';
+@import '@mantine/core/styles/Group.layer.css';
+@import '@mantine/core/styles/ModalBase.layer.css';
+@import '@mantine/core/styles/Input.layer.css';
+@import '@mantine/core/styles/FloatingIndicator.layer.css';
+@import '@mantine/core/styles/Alert.layer.css';
+@import '@mantine/core/styles/Text.layer.css';
+@import '@mantine/core/styles/Anchor.layer.css';
+@import '@mantine/core/styles/Combobox.layer.css';
+@import '@mantine/core/styles/InlineInput.layer.css';
+@import '@mantine/core/styles/CheckboxCard.layer.css';
+@import '@mantine/core/styles/CheckboxIndicator.layer.css';
+@import '@mantine/core/styles/Checkbox.layer.css';
+@import '@mantine/core/styles/Button.layer.css';
+@import '@mantine/core/styles/Center.layer.css';
+@import '@mantine/core/styles/Indicator.layer.css';
+@import '@mantine/core/styles/Menu.layer.css';
+@import '@mantine/core/styles/Modal.layer.css';
+@import '@mantine/core/styles/PasswordInput.layer.css';
+@import '@mantine/core/styles/SegmentedControl.layer.css';
+@import '@mantine/core/styles/Stack.layer.css';
+@import '@mantine/core/styles/Switch.layer.css';
+@import '@mantine/core/styles/Title.layer.css';
+
+/* Fonts: woff2 only — every browser that runs Twitch extensions has it, so the .woff twins are not shipped. */
+@font-face {
+  font-family: 'Nunito';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 600;
+  src: url('../../node_modules/@fontsource/nunito/files/nunito-latin-600-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Nunito';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 600;
+  src: url('../../node_modules/@fontsource/nunito/files/nunito-cyrillic-600-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Nunito';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 700;
+  src: url('../../node_modules/@fontsource/nunito/files/nunito-latin-700-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Nunito';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 700;
+  src: url('../../node_modules/@fontsource/nunito/files/nunito-cyrillic-700-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Nunito';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 800;
+  src: url('../../node_modules/@fontsource/nunito/files/nunito-latin-800-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Nunito';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 800;
+  src: url('../../node_modules/@fontsource/nunito/files/nunito-cyrillic-800-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Great Vibes';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url('../../node_modules/@fontsource/great-vibes/files/great-vibes-latin-400-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Great Vibes';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url('../../node_modules/@fontsource/great-vibes/files/great-vibes-cyrillic-400-normal.woff2') format('woff2');
+}
 
 /* Theme: four base colors (set by applyTheme; defaults = PRESETS.fox), everything else is derived. */
 :root {

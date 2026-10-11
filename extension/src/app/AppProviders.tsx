@@ -1,12 +1,3 @@
-import '@fontsource/nunito/latin-600.css';
-import '@fontsource/nunito/cyrillic-600.css';
-import '@fontsource/nunito/latin-700.css';
-import '@fontsource/nunito/cyrillic-700.css';
-import '@fontsource/nunito/latin-800.css';
-import '@fontsource/nunito/cyrillic-800.css';
-import '@fontsource/great-vibes/latin-400.css';
-import '@fontsource/great-vibes/cyrillic-400.css';
-
 import { MantineProvider } from '@mantine/core';
 import { useMemo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
