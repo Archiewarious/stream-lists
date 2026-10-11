@@ -17,7 +17,8 @@ export interface ImportLot extends PointaucLot {
   watched_at?: number;
 }
 
-export const normalizeTitle = (title: string) => title.trim().toLowerCase();
+/** How titles are compared: case, ё/е, extra spaces and Unicode composition do not matter. */
+export const normalizeTitle = (title: string) => title.normalize('NFC').toLowerCase().replace(/ё/g, 'е').replace(/\s+/g, ' ').trim();
 
 /**
  * GET /api/oshino/lots answers { lots: [{ fastId, id, name, amount, investors }] }; anything malformed is skipped.

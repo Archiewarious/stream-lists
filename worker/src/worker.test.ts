@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { signJwt, verifyJwt } from './jwt';
 import { buildSnapshot, getByteSize, SNAPSHOT_LIMIT_BYTES, type ChannelList, type ItemRow } from './snapshot';
 import { decryptText, encryptText } from './crypto';
-import { matchLots, planLotSync, toPointaucLots } from './pointauc';
+import { matchLots, normalizeTitle, planLotSync, toPointaucLots } from './pointauc';
 import { parseTheme } from './theme';
 import { pickMatch, searchQueries, toMovieDetails, toTmdbResults, type TmdbResult } from './tmdb';
 
@@ -83,6 +83,16 @@ describe('buildSnapshot', () => {
     expect(snapshot.lists[0]).toMatchObject({ qn: 40, wn: 40 });
     expect(snapshot.lists[0].q.length).toBeGreaterThan(0);
     expect(snapshot.lists[0].q[0].i).toBe(1);
+  });
+
+  it('keeps an item of every list when there are many lists', () => {
+    const lists = Array.from({ length: 20 }, (_, index) => ({
+      ...list(Array.from({ length: 120 }, (_, item) => makeItem(index * 1000 + item + 1, item < 60 ? 'queue' : 'watched'))),
+      id: index + 1,
+    }));
+    const content = buildSnapshot(lists);
+    expect(getByteSize(content)).toBeLessThanOrEqual(SNAPSHOT_LIMIT_BYTES);
+    expect(JSON.parse(content).lists.every((entry: { q: unknown[] }) => entry.q.length >= 1)).toBe(true);
   });
 });
 
@@ -195,6 +205,13 @@ describe('pickMatch', () => {
     expect(searchQueries('Интерстеллар 2014')).toEqual(['Интерстеллар 2014', 'Интерстеллар']);
     expect(searchQueries('Дюна (1984)')).toEqual(['Дюна']);
     expect(searchQueries('Матрица')).toEqual(['Матрица']);
+  });
+});
+
+describe('normalizeTitle', () => {
+  it('ignores case, ё, extra spaces and Unicode composition', () => {
+    expect(normalizeTitle(' Ёжик  в Тумане ')).toBe(normalizeTitle('ежик в тумане'));
+    expect(normalizeTitle('Café')).toBe(normalizeTitle('Café'));
   });
 });
 

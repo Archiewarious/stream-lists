@@ -27,6 +27,8 @@ export type Outbound = {
   body?: any;
   auth?: string;
   redirect?: RequestRedirect;
+  /** Whether the call can time out. */
+  signal?: boolean;
 };
 export type TmdbHandler = (url: URL) => Response | Promise<Response>;
 
@@ -53,8 +55,8 @@ export const startWorker = async () => {
   const env = { DB: db, EXTENSION_SECRET: SECRET, CLIENT_ID, OWNER_ID, TMDB_API_KEY: 'test-tmdb-key', TOKEN_ENCRYPTION_KEY: ENCRYPTION_KEY };
 
   const outbound: Outbound[] = [];
-  /** Lots Pointauc answers per token; an unknown token gets 500 (Pointauc's answer to a closed tab). */
-  const pointauc = new Map<string, Lot[]>();
+  /** Lots Pointauc answers per token, or the whole answer; an unknown token gets 500 (Pointauc's closed tab). */
+  const pointauc = new Map<string, Lot[] | (() => Response)>();
   const fake = { tmdb: tmdbKnowsEverything, twitchStatus: 204 };
 
   vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -67,12 +69,13 @@ export const startWorker = async () => {
     }
     if (url.hostname === 'pointauc.com') {
       const auth = (init?.headers as Record<string, string>).Authorization.replace('Bearer ', '');
-      outbound.push({ kind: 'pointauc', url: url.href, auth });
+      outbound.push({ kind: 'pointauc', url: url.href, auth, signal: !!init?.signal });
       const lots = pointauc.get(auth);
+      if (typeof lots === 'function') return lots();
       return lots ? Response.json({ lots: lots.map((lot) => ({ ...lot, investors: [] })) }) : new Response('nope', { status: 500 });
     }
     if (url.hostname === 'api.themoviedb.org') {
-      outbound.push({ kind: 'tmdb', url: url.href, redirect: init?.redirect });
+      outbound.push({ kind: 'tmdb', url: url.href, redirect: init?.redirect, signal: !!init?.signal });
       return fake.tmdb(url);
     }
     throw new Error(`Unexpected outbound fetch: ${url.href}`);

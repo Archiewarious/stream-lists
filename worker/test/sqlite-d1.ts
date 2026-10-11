@@ -13,6 +13,7 @@ export const sqliteD1 = (): D1Database => {
     const rows = () => db.prepare(sql).all(...params).map((row) => ({ ...row }));
     const meta = () => ({ changes: Number(db.prepare('SELECT changes() AS n').get()!.n) });
     const self = {
+      sql, // for tests that look at what was written
       bind: (...values: SQLInputValue[]) => statement(sql, values),
       first: async (column?: string) => {
         await roundTrip();
