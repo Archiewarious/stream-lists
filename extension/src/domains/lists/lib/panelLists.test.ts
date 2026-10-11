@@ -107,5 +107,8 @@ describe('pages beyond the snapshot', () => {
     const reordered = { ...list, queue: [...list.queue].reverse() };
     expect(pagesToReload([list], [reordered], pages)).toEqual([]);
     expect(pagesToReload([list], [next], {})).toEqual([]);
+    // 1 watched: 4 came up from the pages in its place, nothing fell between.
+    const watchedOne = { ...list, queue: [panelItem(2), panelItem(4)], watched: [{ ...panelItem(1), watched_at: 1 }, ...list.watched] };
+    expect(pagesToReload([list], [watchedOne], pages)).toEqual([]);
   });
 });

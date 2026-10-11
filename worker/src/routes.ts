@@ -10,8 +10,8 @@ import {
   MAX_LISTS,
   MAX_TMDB_LOOKUPS,
   SUBREQUEST_LIMIT,
-  type Env,
 } from './config';
+import type { Env } from './env';
 import { encryptText } from './crypto';
 import { HttpError, readBody, readEnum, readMovieFields, readOptionalInt, readQuery, readStatus, readTitle, tmdbLanguage } from './http';
 import { knownLots, matchLots, normalizeTitle } from './pointauc';

@@ -5,6 +5,14 @@ import { useTranslation } from 'react-i18next';
 
 const RATINGS = Array.from({ length: 10 }, (_, index) => index + 1);
 
+/** A row's title, up to two lines, with the year under it. */
+export const RowTitle = ({ title, year }: { title: string; year: number | null }) => (
+  <span className="flex min-w-0 flex-1 flex-col gap-1">
+    <span className="line-clamp-2 leading-tight">{title}</span>
+    <span className="min-h-[12px] text-[11px] font-semibold text-fg-3 tabular-nums">{year}</span>
+  </span>
+);
+
 /** Pointauc bid on the title; 0 for a lot nobody bid on, nothing for a title that is not from an auction. */
 export const Points = ({ value }: { value: number | null }) => {
   const { t, i18n } = useTranslation();

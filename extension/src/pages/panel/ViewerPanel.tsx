@@ -1,17 +1,18 @@
-import { ActionIcon, CloseButton, Loader, ScrollArea, SegmentedControl, TextInput } from '@mantine/core';
-import { IconPencil, IconSearch } from '@tabler/icons-react';
-import { useRef, useState } from 'react';
+import { ActionIcon, Loader, ScrollArea, SegmentedControl } from '@mantine/core';
+import { IconPencil } from '@tabler/icons-react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { formatDay, groupByMonth } from '@domains/lists/lib/items';
 import type { PanelItem, PanelList, PanelStatus } from '@domains/lists/lib/panelLists';
 import { searchOnServer, usePanelLists, type PageState, type Search } from '@domains/lists/model/usePanelLists';
-import { Points, RatingBadge } from '@domains/lists/ui/ItemMeta';
+import { Points, RatingBadge, RowTitle } from '@domains/lists/ui/ItemMeta';
 import ListSwitcher from '@domains/lists/ui/ListSwitcher';
 import PanelRow from '@domains/lists/ui/PanelRow';
 import PanelSearchResults from '@domains/lists/ui/PanelSearchResults';
 import MovieDetailsModal, { type DetailsTarget } from '@domains/movies/ui/MovieDetailsModal';
 import AuthorCredit from '@shared/ui/AuthorCredit';
+import SearchField from '@shared/ui/SearchField';
 import Poster from '@shared/ui/Poster';
 import { useWhenVisible } from '@shared/ui/useWhenVisible';
 
@@ -26,10 +27,7 @@ const QueueRows = ({ list, onOpen }: { list: PanelList; onOpen: OpenDetails }) =
     <PanelRow key={item.id} item={item} onOpen={onOpen} className={`${ROW_CLASS} ${item.tmdb_id ? 'hover:selected' : ''}`}>
       <span className="w-3.5 shrink-0 text-right text-[11px] text-fg-3 tabular-nums">{index + 1}</span>
       <Poster path={item.poster_path} width={24} />
-      <span className="flex min-w-0 flex-1 flex-col gap-1">
-        <span className="line-clamp-2 leading-tight">{item.title}</span>
-        <span className="min-h-[12px] text-[11px] font-semibold text-fg-3 tabular-nums">{item.year}</span>
-      </span>
+      <RowTitle title={item.title} year={item.year} />
       <Points value={item.points} />
     </PanelRow>
   ));
@@ -48,10 +46,7 @@ const WatchedRows = ({ list, onOpen }: { list: PanelList; onOpen: OpenDetails })
           <span className="flex opacity-70">
             <Poster path={item.poster_path} width={24} />
           </span>
-          <span className="flex min-w-0 flex-1 flex-col gap-1">
-            <span className="line-clamp-2 leading-tight">{item.title}</span>
-            <span className="min-h-[12px] text-[11px] font-semibold text-fg-3 tabular-nums">{item.year}</span>
-          </span>
+          <RowTitle title={item.title} year={item.year} />
           <span className="text-[11px] font-semibold text-fg-3">{item.watched_at && formatDay(item.watched_at, i18n.language)}</span>
           <RatingBadge rating={item.rating} />
         </PanelRow>
@@ -102,7 +97,6 @@ export const ViewerPanelView = ({ lists, search, loadMore, pageState, onEdit }: 
   const [tab, setTab] = useState<PanelStatus>('queue');
   const [query, setQuery] = useState('');
   const [details, setDetails] = useState<DetailsTarget | null>(null);
-  const searchRef = useRef<HTMLInputElement>(null);
 
   const openDetails = (item: PanelItem) => {
     if (item.tmdb_id) setDetails({ ...item, tmdb_id: item.tmdb_id });
@@ -134,29 +128,7 @@ export const ViewerPanelView = ({ lists, search, loadMore, pageState, onEdit }: 
             setQuery('');
           }}
         />
-        <TextInput
-          ref={searchRef}
-          className="ml-auto w-[150px] shrink-0"
-          size="xs"
-          leftSection={<IconSearch size={14} />}
-          rightSectionPointerEvents="all"
-          rightSection={
-            isSearching && (
-              <CloseButton
-                size="sm"
-                aria-label={t('panel.clear')}
-                onClick={() => {
-                  setQuery('');
-                  searchRef.current?.focus();
-                }}
-              />
-            )
-          }
-          placeholder={t(list.kind === 'movies' ? 'panel.searchMovies' : 'panel.search')}
-          aria-label={t(list.kind === 'movies' ? 'panel.searchMovies' : 'panel.search')}
-          value={query}
-          onChange={(event) => setQuery(event.currentTarget.value)}
-        />
+        <SearchField className="ml-auto w-[150px] shrink-0" label={t(list.kind === 'movies' ? 'panel.searchMovies' : 'panel.search')} value={query} onChange={setQuery} />
         {onEdit && (
           <ActionIcon variant="default" size="lg" aria-label={t('panel.backToEdit')} title={t('panel.backToEdit')} onClick={onEdit}>
             <IconPencil size={16} />

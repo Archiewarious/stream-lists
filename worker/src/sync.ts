@@ -11,8 +11,8 @@ import {
   SYNC_GIVE_UP_MS,
   SYNC_PACE_MS,
   SYNC_RETRY_MAX_MS,
-  type Env,
 } from './config';
+import type { Env } from './env';
 import { decryptText } from './crypto';
 import { base64ToBytes } from './base64';
 import { HttpError } from './http';

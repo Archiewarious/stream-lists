@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { MAX_TMDB_LOOKUPS } from '@worker/config';
 import { buildSnapshot, type ChannelList, type ItemRow, type ListRow } from '@worker/snapshot';
 import type { ChannelTheme } from '@worker/theme';
 import { applyTheme } from '@app/presets';
@@ -23,9 +24,6 @@ export type EditableItemFields = MovieFields & Partial<Pick<ItemRow, 'title' | '
 export type AddResult = { added: ItemRow[]; skipped: number; unchecked?: number };
 
 type ListsUpdate = (lists: ChannelList[]) => ChannelList[];
-
-// "match-missing" looks this many titles up per call (MAX_TMDB_LOOKUPS in the Worker).
-const MATCH_PER_CALL = 20;
 
 const updateItem = (lists: ChannelList[], itemId: number, update: (items: ItemRow[], item: ItemRow) => ItemRow[]) =>
   lists.map((list) => {
@@ -86,12 +84,14 @@ export const useChannel = () => {
     }
   }, []);
 
-  const onBroadcast = useCallback(
-    (content: string) => {
-      const current = loaded.current;
-      if (pending.current || (current && content === buildSnapshot(current.lists, current.theme))) return;
-      reload();
-    },
+  // Every snapshot the Worker broadcasts (cron sync, another window) reloads the lists, unless it shows what they have.
+  useEffect(
+    () =>
+      twitchApi.listenBroadcast((content) => {
+        const current = loaded.current;
+        if (pending.current || (current && content === buildSnapshot(current.lists, current.theme))) return;
+        reload();
+      }),
     [reload],
   );
 
@@ -118,7 +118,7 @@ export const useChannel = () => {
     }
   };
 
-  /** Posters for titles that were added without one: `rounds` calls of up to MATCH_PER_CALL titles each. */
+  /** Posters for titles that were added without one: `rounds` calls of up to MAX_TMDB_LOOKUPS titles each ("match-missing" looks up that many). */
   const matchMissing = async (listId: number, rounds = 1) => {
     for (let round = 0; round < rounds; round++) {
       if (!(await run(() => callWorker<{ updated: number }>('POST', `/api/lists/${listId}/match-missing`)))) return;
@@ -127,7 +127,7 @@ export const useChannel = () => {
 
   /** Titles a bulk add or an import put in without a lookup (the request's TMDB budget ran out): looked up now. */
   const matchUnchecked = (listId: number, result: AddResult | undefined) => {
-    if (result?.unchecked) matchMissing(listId, Math.ceil(result.unchecked / MATCH_PER_CALL));
+    if (result?.unchecked) matchMissing(listId, Math.ceil(result.unchecked / MAX_TMDB_LOOKUPS));
     return result;
   };
 
@@ -153,7 +153,6 @@ export const useChannel = () => {
     pendingLots,
     loadError,
     reload,
-    onBroadcast,
     isSaving,
     saveError,
     clearSaveError: () => setSaveError(null),

@@ -8,7 +8,6 @@ import PendingLotsModal from '@domains/integrations/pointauc/ui/PendingLotsModal
 import PointaucImportModal from '@domains/integrations/pointauc/ui/PointaucImportModal';
 import { useAddItem } from '@domains/lists/model/useAddItem';
 import { streamerActions, useChannel, type AddResult, type ItemStatus, type ListKind } from '@domains/lists/model/useChannel';
-import { useBroadcastReload } from '@domains/lists/model/useLiveSync';
 import AddItemBar from '@domains/lists/ui/AddItemBar';
 import ItemEditModal from '@domains/lists/ui/ItemEditModal';
 import RatePromptModal from '@domains/lists/ui/RatePromptModal';
@@ -23,7 +22,6 @@ const NOTICE_MS = 6000;
 const ConfigPage = () => {
   const { t } = useTranslation();
   const channel = useChannel();
-  useBroadcastReload(channel); // edits made in the panel show up here too
   const [activeListId, setActiveListId] = useState<number | null>(null);
   const [isAppearanceOpened, setIsAppearanceOpened] = useState(false);
   const [isSettingsOpened, setIsSettingsOpened] = useState(false);

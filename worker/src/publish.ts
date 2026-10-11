@@ -1,6 +1,7 @@
 // The viewers' snapshot: built from D1 and sent to Twitch (config segment and PubSub).
 
-import { SNAPSHOT_PACE_MS, type Env } from './config';
+import { SNAPSHOT_PACE_MS } from './config';
+import type { Env } from './env';
 import { signJwt } from './jwt';
 import { buildSnapshot, SNAPSHOT_MAX_ITEMS, SNAPSHOT_VERSION, type ChannelList, type ItemRow, type ListRow } from './snapshot';
 import { ITEM_ORDER, loadTheme } from './store';

@@ -1,3 +1,4 @@
+import { LIST_KINDS } from '@worker/config';
 import type { ChannelList, ItemRow, ListRow, ViewerItem } from '@worker/snapshot';
 import { parseTheme, type ChannelTheme } from '@worker/theme';
 
@@ -39,7 +40,6 @@ interface SnapshotList {
   w: SnapshotItem[];
 }
 
-const LIST_KINDS = ['movies', 'games', 'custom'];
 const isCount = (value: unknown): value is number => Number.isInteger(value) && (value as number) >= 0;
 const numberOrNull = (value: unknown) => (typeof value === 'number' && Number.isFinite(value) ? value : null);
 
@@ -142,32 +142,32 @@ export const withPages = (lists: PanelList[], pages: LoadedPages): PanelList[] =
     return { ...list, queue: extend(list.queue, own.queue), watched: extend(list.watched, own.watched) };
   });
 
-/** Adds a page to what was loaded, without the items already there. */
-export const addPage = (pages: LoadedPages, listId: number, status: PanelStatus, page: PanelItem[]): LoadedPages => {
-  const loaded = pages[listId]?.[status] ?? [];
-  const known = new Set(loaded.map((item) => item.id));
-  return { ...pages, [listId]: { ...pages[listId], [status]: [...loaded, ...page.filter((item) => !known.has(item.id))] } };
+const joinPages = (pages: LoadedPages, listId: number, status: PanelStatus, first: PanelItem[], rest: PanelItem[]): LoadedPages => {
+  const known = new Set(first.map((item) => item.id));
+  return { ...pages, [listId]: { ...pages[listId], [status]: [...first, ...rest.filter((item) => !known.has(item.id))] } };
 };
 
+/** Adds a page to what was loaded, without the items already there. */
+export const addPage = (pages: LoadedPages, listId: number, status: PanelStatus, page: PanelItem[]) =>
+  joinPages(pages, listId, status, pages[listId]?.[status] ?? [], page);
+
+/** The page right after the snapshot, loaded again, in front of what was loaded (without the items it has). */
+export const putFirstPage = (pages: LoadedPages, listId: number, status: PanelStatus, page: PanelItem[]) =>
+  joinPages(pages, listId, status, page, pages[listId]?.[status] ?? []);
+
 /**
- * Where a new snapshot shows other items first while pages beyond them are loaded. An item pushed past the first
- * ones is then in neither, so the page right after them has to be loaded again.
+ * Where an item the snapshot showed first is now neither among its first items nor in the loaded pages: it was pushed
+ * past the first ones, so the page right after them has to be loaded again.
  */
 export const pagesToReload = (previous: PanelList[], next: PanelList[], pages: LoadedPages) =>
   next.flatMap((list) => {
     const before = previous.find((old) => old.id === list.id);
     return (['queue', 'watched'] as const)
       .filter((status) => {
-        if (!before || !pages[list.id]?.[status]?.length) return false;
-        const ids = new Set(before[status].map((item) => item.id));
-        return list[status].length !== ids.size || list[status].some((item) => !ids.has(item.id));
+        const loaded = pages[list.id]?.[status];
+        if (!before || !loaded?.length) return false;
+        const shown = new Set([...list.queue, ...list.watched, ...loaded].map((item) => item.id));
+        return before[status].some((item) => !shown.has(item.id));
       })
       .map((status) => ({ list, status }));
   });
-
-/** The page right after the snapshot, loaded again, in front of what was loaded (without the items it has). */
-export const putFirstPage = (pages: LoadedPages, listId: number, status: PanelStatus, page: PanelItem[]): LoadedPages => {
-  const known = new Set(page.map((item) => item.id));
-  const loaded = pages[listId]?.[status] ?? [];
-  return { ...pages, [listId]: { ...pages[listId], [status]: [...page, ...loaded.filter((item) => !known.has(item.id))] } };
-};

@@ -1,17 +1,17 @@
+import { MAX_ITEM_TITLE_LENGTH } from '@worker/config';
 import { clipTitle, normalizeTitle } from '@worker/pointauc';
 import type { ItemRow } from '@worker/snapshot';
 
-export const MAX_BULK_ITEMS = 200;
-const MAX_TITLE_LENGTH = 200; // the Worker rejects the whole batch over a longer one
+export { MAX_BULK_ITEMS } from '@worker/config';
 
 /**
  * "Списком": one title per line, blank lines dropped, numbering like "1. " or "- " stripped. Control characters go
- * first, as the Worker drops them too (a line of only those would fail the whole batch).
+ * first, as the Worker drops them too (a line of only those would fail the whole batch); so do longer titles.
  */
 export const parseBulkTitles = (text: string) =>
   text
     .split('\n')
-    .map((line) => clipTitle(line.replace(/\p{Cc}/gu, '').replace(/^\s*(\d+[.)]|[-*•])\s+/, '').trim(), MAX_TITLE_LENGTH))
+    .map((line) => clipTitle(line.replace(/\p{Cc}/gu, '').replace(/^\s*(\d+[.)]|[-*•])\s+/, '').trim(), MAX_ITEM_TITLE_LENGTH))
     .filter(Boolean);
 
 export interface MonthGroup<T> {

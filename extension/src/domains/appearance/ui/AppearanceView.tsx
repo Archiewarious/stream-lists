@@ -29,8 +29,8 @@ const AppearanceView = ({ theme, list, onPreview, onSave }: AppearanceViewProps)
   const current = theme ?? DEFAULT_THEME;
   const isCustom = !('preset' in current);
   // The own colors last picked here stay for "Свои цвета" after a preset was tried in between.
-  const [lastCustom, setLastCustom] = useState('preset' in current ? DEFAULT_CUSTOM : current);
-  const custom = 'preset' in current ? lastCustom : current;
+  const [lastCustom, setLastCustom] = useState(isCustom ? current : DEFAULT_CUSTOM);
+  const custom = isCustom ? current : lastCustom;
   // A color picker fires on every drag step: repaint each time, save once it settles.
   const saveLater = useDebouncedCallback(onSave, { delay: SAVE_DELAY_MS, flushOnUnmount: true });
 
@@ -62,8 +62,8 @@ const AppearanceView = ({ theme, list, onPreview, onSave }: AppearanceViewProps)
               type="button"
               onClick={() => pick({ preset: id })}
               className="glass flex items-center gap-3 rounded-[18px] p-3 text-left text-sm font-bold"
-              style={'preset' in current && current.preset === id ? SELECTED : undefined}
-              aria-pressed={'preset' in current && current.preset === id}
+              style={!isCustom && current.preset === id ? SELECTED : undefined}
+              aria-pressed={!isCustom && current.preset === id}
             >
               <span
                 className="size-[34px] shrink-0 rounded-full"

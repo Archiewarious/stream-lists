@@ -22,7 +22,7 @@ import type { ItemRow } from '@worker/snapshot';
 import { dragQueueOrder, formatDay, groupByMonth } from '@domains/lists/lib/items';
 import type { ListKind } from '@domains/lists/model/useChannel';
 import { HIDE_ON_HOVER, SHOW_ON_HOVER } from '@domains/lists/ui/hoverActions';
-import { Points, RatingBadge } from '@domains/lists/ui/ItemMeta';
+import { Points, RatingBadge, RowTitle } from '@domains/lists/ui/ItemMeta';
 import ConfirmPopover from '@shared/ui/ConfirmPopover';
 import Poster from '@shared/ui/Poster';
 
@@ -99,10 +99,7 @@ const QueueRow = ({ item, place, kind, isCompact, ...actions }: RowProps & { ite
       )}
       <span className="w-4 shrink-0 text-right text-[11px] text-fg-3 tabular-nums">{place}</span>
       <Poster path={item.poster_path} width={24} />
-      <span className="flex min-w-0 flex-1 flex-col gap-1">
-        <span className="line-clamp-2 leading-tight">{item.title}</span>
-        <span className="min-h-[12px] text-[11px] font-semibold text-fg-3 tabular-nums">{item.year}</span>
-      </span>
+      <RowTitle title={item.title} year={item.year} />
       <span className={`flex items-center ${HIDE_ON_HOVER}`}>
         <Points value={item.points} />
       </span>
@@ -194,10 +191,7 @@ export const WatchedList = ({ items, emptyText, isCompact = false, ...actions }:
           <span className="flex opacity-70">
             <Poster path={item.poster_path} width={24} />
           </span>
-          <span className="flex min-w-0 flex-1 flex-col gap-1">
-            <span className="line-clamp-2 leading-tight">{item.title}</span>
-            <span className="min-h-[12px] text-[11px] font-semibold text-fg-3 tabular-nums">{item.year}</span>
-          </span>
+          <RowTitle title={item.title} year={item.year} />
           <span className={`text-xs font-semibold text-fg-3 ${HIDE_ON_HOVER}`}>
             {item.watched_at && formatDay(item.watched_at, i18n.language)}
           </span>

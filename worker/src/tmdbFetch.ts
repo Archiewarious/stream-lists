@@ -1,6 +1,7 @@
 // TMDB requests from the Worker (the key stays here; the browser only sees the results).
 
-import { MAX_TMDB_LOOKUPS, OUTSIDE_TIMEOUT_MS, SUBREQUEST_LIMIT, type Env } from './config';
+import { MAX_TMDB_LOOKUPS, OUTSIDE_TIMEOUT_MS, SUBREQUEST_LIMIT } from './config';
+import type { Env } from './env';
 import { HttpError } from './http';
 import type { ItemRow, ListRow } from './snapshot';
 import { pickMatch, searchQueries, toTmdbResults, type TmdbResult } from './tmdb';

@@ -1,9 +1,10 @@
-import { ActionIcon, Alert, CloseButton, Indicator, Loader, ScrollArea, SegmentedControl, TextInput } from '@mantine/core';
-import { IconAlertTriangle, IconEye, IconListCheck, IconSearch, IconSettings } from '@tabler/icons-react';
-import { useRef, useState } from 'react';
+import { ActionIcon, Alert, Indicator, Loader, ScrollArea, SegmentedControl } from '@mantine/core';
+import { IconAlertTriangle, IconEye, IconListCheck, IconSettings } from '@tabler/icons-react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import AuthorCredit from '@shared/ui/AuthorCredit';
+import SearchField from '@shared/ui/SearchField';
 import { matchesTitle } from '@domains/lists/lib/items';
 import { useAddItem } from '@domains/lists/model/useAddItem';
 import { streamerActions, type Channel, type ItemStatus } from '@domains/lists/model/useChannel';
@@ -36,7 +37,6 @@ const AuthorPanel = ({ channel, syncError, onViewAsViewer }: AuthorPanelProps) =
   const [isPendingOpened, setIsPendingOpened] = useState(false);
   const [isPointaucOpened, setIsPointaucOpened] = useState(false);
   const [ratingId, setRatingId] = useState<number | null>(null);
-  const searchRef = useRef<HTMLInputElement>(null);
 
   const list = channel.lists?.find((candidate) => candidate.id === activeListId) ?? channel.lists?.[0];
   // A title typed in goes where the streamer is looking: the open tab.
@@ -74,29 +74,7 @@ const AuthorPanel = ({ channel, syncError, onViewAsViewer }: AuthorPanelProps) =
             setQuery('');
           }}
         />
-        <TextInput
-          ref={searchRef}
-          className="ml-auto w-[76px] shrink-0"
-          size="xs"
-          leftSection={<IconSearch size={14} />}
-          rightSectionPointerEvents="all"
-          rightSection={
-            isSearching && (
-              <CloseButton
-                size="sm"
-                aria-label={t('panel.clear')}
-                onClick={() => {
-                  setQuery('');
-                  searchRef.current?.focus();
-                }}
-              />
-            )
-          }
-          placeholder={t('config.search')}
-          aria-label={t('config.search')}
-          value={query}
-          onChange={(event) => setQuery(event.currentTarget.value)}
-        />
+        <SearchField className="ml-auto w-[76px] shrink-0" label={t('config.search')} value={query} onChange={setQuery} />
         {/* The dot: Pointauc is not connected yet, or the sync cannot reach it. */}
         <Indicator size={9} offset={4} color="var(--accent)" disabled={channel.isPointaucConnected && !syncError}>
           <ActionIcon

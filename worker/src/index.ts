@@ -1,7 +1,7 @@
 // Stream Lists Worker: the extension's API (routes.ts), snapshots for viewers (publish.ts) and the automatic
 // Pointauc sync (sync.ts, cron once a minute).
 
-import type { Env } from './config';
+import type { Env } from './env';
 import { CORS_HEADERS, HttpError, json } from './http';
 import { verifyJwt } from './jwt';
 import { publishSnapshot } from './publish';

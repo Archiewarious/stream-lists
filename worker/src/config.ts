@@ -1,15 +1,4 @@
-// The Worker's environment and the limits everything here is sized to.
-
-export interface Env {
-  DB: D1Database;
-  EXTENSION_SECRET: string;
-  /** The secret before a rotation, accepted until every viewer has a token signed with the new one. */
-  EXTENSION_SECRET_PREVIOUS?: string;
-  CLIENT_ID: string;
-  OWNER_ID: string;
-  TMDB_API_KEY?: string;
-  TOKEN_ENCRYPTION_KEY?: string;
-}
+// The limits everything here is sized to. No Workers-only types: the extension imports these too.
 
 export const MAX_LISTS = 20;
 export const MAX_ITEMS_PER_LIST = 2000;
