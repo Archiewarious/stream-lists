@@ -85,11 +85,24 @@ export const startWorker = async () => {
   const ctx = { waitUntil: (promise: Promise<unknown>) => waits.push(promise), passThroughOnException() {}, props: {} } as unknown as ExecutionContext;
 
   const token = (channel: string, role = 'broadcaster', extra: object = {}) =>
-    signJwt({ exp: Math.floor(Date.now() / 1000) + 60, channel_id: channel, role, user_id: 'u1', ...extra }, SECRET);
+    signJwt({ exp: Math.floor(Date.now() / 1000) + 3600, channel_id: channel, role, user_id: 'u1', ...extra }, SECRET);
 
   type CallOptions = { channel?: string; role?: string; body?: unknown; auth?: string | null };
   /** One request through the Worker; waits for its waitUntil work (the snapshot publish) before returning. */
+  /**
+   * Virtual time: every request and cron run starts a minute after the previous one, so the Worker's own pacing
+   * (sync passes, snapshot publishes) never holds a test up. A test that needs requests close together sets
+   * `clock.auto = false` and moves `clock.now` itself.
+   */
+  const clock = { now: Date.now(), auto: true };
+  const realNow = Date.now;
+  Date.now = () => clock.now;
+  const tick = () => {
+    if (clock.auto) clock.now += 60_000;
+  };
+
   const call = async (method: string, path: string, { channel = 'c1', role = 'broadcaster', body, auth }: CallOptions = {}) => {
+    tick();
     const start = outbound.length;
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (auth === undefined) headers.Authorization = `Bearer ${await token(channel, role)}`;
@@ -114,6 +127,7 @@ export const startWorker = async () => {
   };
 
   const scheduled = async () => {
+    tick();
     const start = outbound.length;
     await worker.scheduled({} as ScheduledController, env as any, ctx);
     await Promise.allSettled(waits.splice(0));
@@ -154,11 +168,12 @@ export const startWorker = async () => {
   };
 
   const dispose = async () => {
+    Date.now = realNow;
     vi.unstubAllGlobals();
     await proxy?.dispose();
   };
 
-  return { env, db, outbound, pointauc, fake, token, call, scheduled, all, dump, seedList, connectPointauc, dispose };
+  return { env, db, outbound, pointauc, fake, clock, token, call, scheduled, all, dump, seedList, connectPointauc, dispose };
 };
 
 export type TestWorker = Awaited<ReturnType<typeof startWorker>>;

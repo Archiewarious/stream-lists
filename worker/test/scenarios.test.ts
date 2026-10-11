@@ -81,7 +81,7 @@ describe('adding items', () => {
     const titles = Array.from({ length: 30 }, (_, i) => `Film ${i + 1}`);
     const response = await w.call('POST', '/api/items/bulk', { channel: 'bulk-budget', body: { list_id: list.id, titles } });
     expect(response.data.added.length).toBe(30);
-    expect(response.data.unchecked).toBe(5);
+    expect(response.data.unchecked).toBe(10); // 20 titles per request
   });
 
   it('"match-missing" gets to every title without a poster, a few per call', async () => {

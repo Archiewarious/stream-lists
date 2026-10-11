@@ -30,8 +30,11 @@ export interface ItemRow {
   tmdb_type: 'movie' | 'tv' | null;
 }
 
-/** Items are expected in display order: queue by bid (then position), watched newest first. */
-export type ChannelList = ListRow & { items: ItemRow[] };
+/**
+ * Items are expected in display order: queue by bid (then position), watched newest first. `counts` is set when
+ * `items` holds only the first ones of each kind (the Worker reads no more than a snapshot can take).
+ */
+export type ChannelList = ListRow & { items: ItemRow[]; counts?: { queue: number; watched: number } };
 
 export const SNAPSHOT_VERSION = '2';
 export const SNAPSHOT_LIMIT_BYTES = 5000;
@@ -47,6 +50,8 @@ const SNAPSHOT_STEPS = [
   [1, 0],
   [0, 0],
 ] as const;
+/** The most queue / watched items of one list a snapshot holds. */
+export const SNAPSHOT_MAX_ITEMS = { queue: SNAPSHOT_STEPS[0][0], watched: SNAPSHOT_STEPS[0][1] };
 
 // Short keys: the snapshot is size-capped. Null fields are dropped by JSON.stringify.
 const compactItem = (item: ItemRow) => ({
@@ -78,8 +83,8 @@ export const buildSnapshot = (lists: ChannelList[], theme: ChannelTheme | null =
         i: list.id,
         t: list.title,
         k: list.kind,
-        qn: queue.length,
-        wn: watched.length,
+        qn: list.counts?.queue ?? queue.length,
+        wn: list.counts?.watched ?? watched.length,
         q: queue.slice(0, queueLimit).map(compactItem),
         w: watched.slice(0, watchedLimit).map(compactItem),
       })),

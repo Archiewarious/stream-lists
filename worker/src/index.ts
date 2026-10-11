@@ -1,7 +1,7 @@
 import { decryptText, encryptText } from './crypto';
 import { signJwt, verifyJwt } from './jwt';
 import { matchLots, normalizeTitle, planLotSync, toPointaucLots, type PointaucLot } from './pointauc';
-import { buildSnapshot, SNAPSHOT_VERSION, type ChannelList, type ItemRow, type ListRow } from './snapshot';
+import { buildSnapshot, SNAPSHOT_MAX_ITEMS, SNAPSHOT_VERSION, type ChannelList, type ItemRow, type ListRow } from './snapshot';
 import { parseTheme, type ChannelTheme } from './theme';
 import { pickMatch, POSTER_PATH, searchQueries, toMovieDetails, toTmdbResults, type TmdbResult } from './tmdb';
 
@@ -24,8 +24,17 @@ const MAX_ITEM_TITLE_LENGTH = 200;
 const LIST_KINDS = ['movies', 'games', 'custom'];
 const ITEM_STATUSES = ['queue', 'watched'];
 const TMDB_TYPES = ['movie', 'tv'];
-// A Worker request may make 50 subrequests; a few go to Pointauc and Twitch, the rest to TMDB lookups.
-const MAX_TMDB_LOOKUPS = 25;
+// Cloudflare Free: one request or one cron run may make 50 subrequests to the outside (D1 does not count). A sync pass
+// spends one on Pointauc and two on the snapshot publish; TMDB lookups get the rest (see Budget).
+const SUBREQUEST_LIMIT = 50;
+// Titles looked up per request (each one or two TMDB searches) — also keeps a burst under TMDB's ~40 a second.
+const MAX_TMDB_LOOKUPS = 20;
+// One sync pass per channel this often, however many panels ask; the panel asks every 12 s.
+const SYNC_PACE_MS = 10_000;
+// Snapshot publishes per channel at most this often: Twitch takes about 20 config writes a minute.
+const SNAPSHOT_PACE_MS = 3_100;
+// Channels one cron run syncs (picked at random): a run must fit Free's 10 ms of CPU.
+const CRON_CHANNELS = 4;
 // The automatic sync queues a lot by itself only if TMDB's entry has this many votes — viewers write the lots,
 // and TMDB has odd entries named like anything.
 const AUTO_ADD_MIN_VOTES = 20;
@@ -274,14 +283,20 @@ const searchTmdb = async (query: string, language: string, apiKey: string) =>
 
 type TmdbFields = Pick<ItemRow, 'tmdb_id' | 'year' | 'poster_path' | 'tmdb_type'>;
 
+/** Subrequests to the outside this invocation may still make (see SUBREQUEST_LIMIT). */
+type Budget = { left: number };
+/** For a request: the rest after Pointauc and the snapshot publish. */
+const requestBudget = (): Budget => ({ left: SUBREQUEST_LIMIT - 3 });
+
 /**
  * Poster, year and TMDB id for the titles TMDB knows for sure (`found`). The rest were looked up and not found,
- * or the lookup `failed` (TMDB down or rate-limited — worth another try), or were `unchecked`: one request looks up
- * at most MAX_TMDB_LOOKUPS titles.
+ * or the lookup `failed` (TMDB down or rate-limited — worth another try), or were `unchecked`: past
+ * MAX_TMDB_LOOKUPS titles or past the subrequest `budget` (each search takes one).
  */
-const matchTitles = async (env: Env, titles: string[], minVotes = 0) => {
+const matchTitles = async (env: Env, titles: string[], budget: Budget, minVotes = 0) => {
   const found = new Map<string, TmdbFields>();
   const failed = new Set<string>();
+  const unchecked = titles.slice(MAX_TMDB_LOOKUPS);
   const apiKey = env.TMDB_API_KEY;
   if (!apiKey) return { found, failed, unchecked: titles };
   await Promise.all(
@@ -289,6 +304,8 @@ const matchTitles = async (env: Env, titles: string[], minVotes = 0) => {
       try {
         let match: TmdbResult | null = null;
         for (const query of searchQueries(title)) {
+          if (budget.left < 1) return unchecked.push(title);
+          budget.left -= 1;
           match = pickMatch(title, await searchTmdb(query.slice(0, 100), 'ru-RU', apiKey));
           if (match) break;
         }
@@ -301,7 +318,7 @@ const matchTitles = async (env: Env, titles: string[], minVotes = 0) => {
       }
     }),
   );
-  return { found, failed, unchecked: titles.slice(MAX_TMDB_LOOKUPS) };
+  return { found, failed, unchecked };
 };
 
 /**
@@ -320,7 +337,7 @@ const syncLots = async (env: Env, list: ListRow, lots: PointaucLot[], addIds: Se
     throw new HttpError(409, `At most ${MAX_ITEMS_PER_LIST} items`);
   }
 
-  const { found, unchecked } = await matchTitles(env, list.kind === 'movies' ? plan.toAdd.map((lot) => lot.name) : []);
+  const { found, unchecked } = await matchTitles(env, list.kind === 'movies' ? plan.toAdd.map((lot) => lot.name) : [], requestBudget());
 
   const update = db.prepare('UPDATE items SET points = ?, lot_id = ? WHERE id = ?');
   const updates = plan.toUpdate.map((change) => update.bind(change.points, change.lot_id, change.id));
@@ -337,10 +354,51 @@ const syncLots = async (env: Env, list: ListRow, lots: PointaucLot[], addIds: Se
 
 // --- Twitch snapshot ---
 
-// ponytail: one publish per write request, no cross-request debounce; concurrent writes may land out of order
-// until the next write. Add a Durable Object debounce if Twitch rate limits (config ~20/min per channel) bite.
+//** The channel's lists with only the items a snapshot can hold (the first of each kind, in display order). */
+const loadSnapshotLists = async (db: D1Database, channelId: string): Promise<ChannelList[]> => {
+  const [lists, items] = await db.batch([
+    db.prepare('SELECT * FROM lists WHERE channel_id = ? ORDER BY id').bind(channelId),
+    db
+      .prepare(
+        `SELECT * FROM (
+           SELECT items.*, ROW_NUMBER() OVER (PARTITION BY items.list_id, items.status ORDER BY ${ITEM_ORDER}) AS place,
+                  COUNT(*) OVER (PARTITION BY items.list_id, items.status) AS total
+           FROM items JOIN lists ON lists.id = items.list_id WHERE lists.channel_id = ?
+         ) WHERE place <= CASE status WHEN 'queue' THEN ${SNAPSHOT_MAX_ITEMS.queue} ELSE ${SNAPSHOT_MAX_ITEMS.watched} END
+         ORDER BY place`,
+      )
+      .bind(channelId),
+  ]);
+  const rows = items.results as unknown as (ItemRow & { total: number })[];
+  return (lists.results as unknown as ListRow[]).map((list) => {
+    const own = rows.filter((item) => item.list_id === list.id);
+    const count = (status: ItemRow['status']) => own.find((item) => item.status === status)?.total ?? 0;
+    return { ...list, items: own, counts: { queue: count('queue'), watched: count('watched') } };
+  });
+};
+
+/**
+ * Sends the channel's snapshot to Twitch (config segment and PubSub). Twitch takes about 20 config writes a minute,
+ * so publishes of a channel go out at least SNAPSHOT_PACE_MS apart: the call that gets the next turn waits for it and
+ * only then reads the channel; a call that finds the next turn already taken stops — the waiting one will read what
+ * its request wrote. A publish Twitch did not take is marked, and the cron sends it again.
+ */
 const publishSnapshot = async (env: Env, channelId: string) => {
-  const content = buildSnapshot(await loadChannel(env.DB, channelId), await loadTheme(env.DB, channelId));
+  const db = env.DB;
+  const now = Date.now();
+  const turn = await db
+    .prepare(
+      `INSERT INTO channels (channel_id, snapshot_at) VALUES (?1, ?2)
+       ON CONFLICT (channel_id) DO UPDATE SET snapshot_at = MAX(?2, COALESCE(snapshot_at, 0) + ${SNAPSHOT_PACE_MS})
+       WHERE snapshot_at IS NULL OR snapshot_at <= ?2
+       RETURNING snapshot_at`,
+    )
+    .bind(channelId, now)
+    .first<number>('snapshot_at');
+  if (turn === null) return;
+  if (turn > now) await new Promise((resolve) => setTimeout(resolve, turn - now));
+
+  const content = buildSnapshot(await loadSnapshotLists(db, channelId), await loadTheme(db, channelId));
   const token = await signJwt(
     {
       exp: Math.floor(Date.now() / 1000) + 60,
@@ -353,43 +411,83 @@ const publishSnapshot = async (env: Env, channelId: string) => {
   );
   const headers = { Authorization: `Bearer ${token}`, 'Client-Id': env.CLIENT_ID, 'Content-Type': 'application/json' };
 
-  const responses = await Promise.all([
-    fetch('https://api.twitch.tv/helix/extensions/configurations', {
-      method: 'PUT',
-      headers,
-      body: JSON.stringify({
-        extension_id: env.CLIENT_ID,
-        segment: 'broadcaster',
-        broadcaster_id: channelId,
-        version: SNAPSHOT_VERSION,
-        content,
+  let isSent = true;
+  try {
+    const responses = await Promise.all([
+      fetch('https://api.twitch.tv/helix/extensions/configurations', {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify({
+          extension_id: env.CLIENT_ID,
+          segment: 'broadcaster',
+          broadcaster_id: channelId,
+          version: SNAPSHOT_VERSION,
+          content,
+        }),
       }),
-    }),
-    fetch('https://api.twitch.tv/helix/extensions/pubsub', {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ target: ['broadcast'], broadcaster_id: channelId, message: content }),
-    }),
-  ]);
-  for (const response of responses) {
-    if (!response.ok) console.error('Twitch snapshot failed', response.url, response.status, await response.text());
+      fetch('https://api.twitch.tv/helix/extensions/pubsub', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ target: ['broadcast'], broadcaster_id: channelId, message: content }),
+      }),
+    ]);
+    for (const response of responses) {
+      if (response.ok) continue;
+      isSent = false;
+      console.error('Twitch snapshot failed', response.url, response.status, await response.text());
+    }
+  } catch (error) {
+    isSent = false;
+    console.error('Twitch snapshot failed', error);
   }
+  await db
+    .prepare('UPDATE channels SET snapshot_stale = ?1 WHERE channel_id = ?2 AND snapshot_stale IS NOT ?1')
+    .bind(isSent ? 0 : 1, channelId)
+    .run();
 };
 
 // --- automatic Pointauc sync ---
 
 type PendingLot = { id: number; list_id: number; name: string; points: number | null };
 
+/** SHA-256 of a string, hex — fingerprints the Pointauc lots a sync pass handled. */
+const fingerprint = async (text: string) =>
+  [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)))]
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('');
+
 /**
  * One sync pass for a channel: bids of known titles are refreshed; a new lot goes straight into the queue when TMDB
  * knows the title for sure (a movie list), otherwise it waits in "pending" for the streamer. A lot seen once is never
  * looked at again, so deleting or hiding it is final.
+ *
+ * A pass runs at most once per SYNC_PACE_MS for a channel, and does not read the list at all when Pointauc answers
+ * the same lots as the last pass that handled them all. `force` (switching the sync on) skips both. Returns whether
+ * anything was written; the snapshot is published by the pass itself, and only if viewers would see a change.
  */
-const autoSyncChannel = async (env: Env, channelId: string, listId: number, storedToken: string): Promise<boolean> => {
+const autoSyncChannel = async (env: Env, channelId: string, listId: number, storedToken: string, budget: Budget, force = false) => {
   const db = env.DB;
+  if (budget.left < 3) return false; // Pointauc and a publish do not fit: the next run will
   const list = await db.prepare('SELECT * FROM lists WHERE id = ? AND channel_id = ?').bind(listId, channelId).first<ListRow>();
   if (!list) return false;
+  const now = Date.now();
+  const claim = await db
+    .prepare(
+      `UPDATE channels SET pointauc_synced_at = ?1
+       WHERE channel_id = ?2 AND (?3 OR pointauc_synced_at IS NULL OR pointauc_synced_at <= ?1 - ${SYNC_PACE_MS})
+       RETURNING pointauc_lots_hash`,
+    )
+    .bind(now, channelId, force ? 1 : 0)
+    .first<{ pointauc_lots_hash: string | null }>();
+  if (!claim) return false; // another pass ran moments ago
+
+  budget.left -= 3; // Pointauc now, the publish at the end
   const lots = await fetchPointaucLots(await readPointaucToken(env, storedToken));
+  const lotsHash = await fingerprint(JSON.stringify([list.id, lots]));
+  if (!force && lotsHash === claim.pointauc_lots_hash) {
+    budget.left += 2;
+    return false;
+  }
 
   const [items, pending] = await Promise.all([
     db
@@ -413,24 +511,23 @@ const autoSyncChannel = async (env: Env, channelId: string, listId: number, stor
     fresh.push(lot);
   }
 
-  // A movie list looks new lots up in TMDB, a few per pass (the Worker's subrequest budget); the rest are picked up
-  // a minute later. Other lists have nothing to look up.
-  const batch = list.kind === 'movies' ? fresh.slice(0, MAX_TMDB_LOOKUPS) : fresh;
-  const { found, failed } = await matchTitles(env, list.kind === 'movies' ? batch.map((lot) => lot.name) : [], AUTO_ADD_MIN_VOTES);
+  // A movie list looks new lots up in TMDB as far as the budget goes; the rest are picked up next pass. Other lists
+  // have nothing to look up.
+  const titles = list.kind === 'movies' ? fresh.map((lot) => lot.name) : [];
+  const { found, failed, unchecked } = await matchTitles(env, titles, budget, AUTO_ADD_MIN_VOTES);
+  const handled = fresh.filter((lot) => !failed.has(lot.name) && !unchecked.includes(lot.name));
   // Into the queue while the list has room; the rest waits for the streamer. A failed lookup is not "TMDB does not
   // know it": that lot stays unseen and is looked up again next pass.
   const room = Math.max(MAX_ITEMS_PER_LIST - items.results.length, 0);
-  const toQueue = batch.filter((lot) => found.has(lot.name)).slice(0, room);
-  const toPending = batch.filter((lot) => !toQueue.includes(lot) && !failed.has(lot.name));
+  const toQueue = handled.filter((lot) => found.has(lot.name)).slice(0, room);
+  const toPending = handled.filter((lot) => !toQueue.includes(lot));
   // Bids keep changing while a lot waits in "pending" too.
   const pendingBids = new Map(pending.results.filter((lot) => lot.status === 'pending').map((lot) => [lot.lot_id, lot.points]));
   const toRebid = lots.filter((lot) => pendingBids.has(lot.id) && pendingBids.get(lot.id) !== lot.amount);
 
-  const now = Date.now();
   const update = db.prepare('UPDATE items SET points = ?, lot_id = ? WHERE id = ?');
   const park = db.prepare('INSERT OR IGNORE INTO pending_lots (list_id, lot_id, name, points, created_at) VALUES (?, ?, ?, ?, ?)');
   const rebid = db.prepare("UPDATE pending_lots SET points = ? WHERE list_id = ? AND lot_id = ? AND status = 'pending'");
-
   const statements = [
     ...plan.toUpdate.map((change) => update.bind(change.points, change.lot_id, change.id)),
     ...toQueue.map((lot) =>
@@ -443,24 +540,38 @@ const autoSyncChannel = async (env: Env, channelId: string, listId: number, stor
     ...toPending.map((lot) => park.bind(list.id, lot.id, lot.name, lot.amount, now)),
     ...toRebid.map((lot) => rebid.bind(lot.amount, list.id, lot.id)),
   ];
-  if (!statements.length) return false;
+  // The fingerprint is kept only when every lot was handled: lots left for later must not look done.
+  const isComplete = handled.length === fresh.length;
+  const remember = db.prepare('UPDATE channels SET pointauc_lots_hash = ? WHERE channel_id = ?').bind(isComplete ? lotsHash : null, channelId);
+  await db.batch([...statements, remember]);
 
-  await db.batch(statements);
-  await publishSnapshot(env, channelId);
-  return true;
+  const isVisible = plan.toUpdate.length + toQueue.length > 0; // pending lots are not in the snapshot
+  if (isVisible) await publishSnapshot(env, channelId);
+  else budget.left += 2;
+  return statements.length > 0;
 };
 
-/** Cron entry: every channel that switched the sync on. A failing channel (Pointauc tab closed) is just skipped. */
-// ponytail: channels are handled one after another within one invocation's subrequest budget (50); with many
-// channels, spread them over several cron ticks or use a queue.
+/**
+ * Cron entry: snapshots Twitch did not take go out again, then a few channels that switched the sync on (picked at
+ * random, so every channel gets its turn). A failing channel (Pointauc tab closed) is just skipped.
+ */
+// ponytail: CRON_CHANNELS random channels a minute; with dozens of syncing channels each waits minutes for its
+// turn — then add a sync queue (or move to Workers Paid).
 const runAutoSync = async (env: Env) => {
-  const channels = await env.DB
-    .prepare('SELECT channel_id, pointauc_list_id, pointauc_token FROM channels WHERE pointauc_list_id IS NOT NULL AND pointauc_token IS NOT NULL LIMIT 10')
-    .all<{ channel_id: string; pointauc_list_id: number; pointauc_token: string }>();
+  const budget: Budget = { left: SUBREQUEST_LIMIT };
+  const stale = await env.DB.prepare(`SELECT channel_id FROM channels WHERE snapshot_stale = 1 LIMIT ${CRON_CHANNELS}`).all<{ channel_id: string }>();
+  for (const { channel_id } of stale.results) {
+    budget.left -= 2;
+    await publishSnapshot(env, channel_id);
+  }
 
+  const channels = await env.DB.prepare(
+    `SELECT channel_id, pointauc_list_id, pointauc_token FROM channels
+     WHERE pointauc_list_id IS NOT NULL AND pointauc_token IS NOT NULL ORDER BY random() LIMIT ${CRON_CHANNELS}`,
+  ).all<{ channel_id: string; pointauc_list_id: number; pointauc_token: string }>();
   for (const channel of channels.results) {
     try {
-      await autoSyncChannel(env, channel.channel_id, channel.pointauc_list_id, channel.pointauc_token);
+      await autoSyncChannel(env, channel.channel_id, channel.pointauc_list_id, channel.pointauc_token, budget);
     } catch (error) {
       // A closed Pointauc tab (502) or a token to enter again (409) is the usual state, not worth a log line a minute.
       if (!(error instanceof HttpError && (error.status === 502 || error.status === 409))) {
@@ -563,7 +674,7 @@ const handleApi = async (request: Request, env: Env, channelId: string, route: s
       const list = await getOwnedList(db, channelId, listId);
       await saveSetting(db, channelId, 'pointauc_list_id', list.id);
       try {
-        await autoSyncChannel(env, channelId, list.id, stored);
+        await autoSyncChannel(env, channelId, list.id, stored, { left: SUBREQUEST_LIMIT }, true);
         return { ok: true, synced: true };
       } catch (error) {
         console.error('First sync failed', error); // stays on: the next minute may find the Pointauc tab open
@@ -576,7 +687,7 @@ const handleApi = async (request: Request, env: Env, channelId: string, route: s
       // shows up almost at once instead of at the next cron tick. Publishing is done by the pass itself.
       const settings = await loadSettings(db, channelId);
       if (!settings?.pointauc_token || settings.pointauc_list_id === null) return { updated: 0, changed: false };
-      const changed = await autoSyncChannel(env, channelId, settings.pointauc_list_id, settings.pointauc_token);
+      const changed = await autoSyncChannel(env, channelId, settings.pointauc_list_id, settings.pointauc_token, { left: SUBREQUEST_LIMIT });
       return { updated: 0, changed }; // updated: 0 — no second snapshot publish from the generic handler
     }
 
@@ -595,7 +706,7 @@ const handleApi = async (request: Request, env: Env, channelId: string, route: s
       const title = 'title' in body ? readTitle(body.title, MAX_ITEM_TITLE_LENGTH) : row.name;
 
       const fields = readMovieFields(body);
-      if (list.kind === 'movies' && !('tmdb_id' in body)) Object.assign(fields, (await matchTitles(env, [title])).found.get(title));
+      if (list.kind === 'movies' && !('tmdb_id' in body)) Object.assign(fields, (await matchTitles(env, [title], requestBudget())).found.get(title));
 
       const existing = await db.prepare('SELECT title FROM items WHERE list_id = ?').bind(list.id).all<{ title: string }>();
       if (existing.results.some((item) => normalizeTitle(item.title) === normalizeTitle(title))) {
@@ -685,7 +796,7 @@ const handleApi = async (request: Request, env: Env, channelId: string, route: s
         )
         .bind(list.id, MAX_TMDB_LOOKUPS)
         .all<Pick<ItemRow, 'id' | 'title'>>();
-      const { found, failed } = await matchTitles(env, missing.results.map((item) => item.title));
+      const { found, failed } = await matchTitles(env, missing.results.map((item) => item.title), requestBudget());
       const update = db.prepare('UPDATE items SET tmdb_id = ?, year = ?, poster_path = ?, tmdb_type = ? WHERE id = ?');
       const tried = db.prepare('UPDATE items SET match_tried_at = ? WHERE id = ?');
       const updates = missing.results.flatMap((item) => {
@@ -736,7 +847,7 @@ const handleApi = async (request: Request, env: Env, channelId: string, route: s
       if (existing.results.some((item) => normalizeTitle(item.title) === normalizeTitle(title))) throw new HttpError(409, 'Already in the list');
       if (existing.results.length >= MAX_ITEMS_PER_LIST) throw new HttpError(409, `At most ${MAX_ITEMS_PER_LIST} items`);
       // Typed without picking a suggestion: TMDB may still know it for sure.
-      if (list.kind === 'movies' && !('tmdb_id' in body)) Object.assign(fields, (await matchTitles(env, [title])).found.get(title));
+      if (list.kind === 'movies' && !('tmdb_id' in body)) Object.assign(fields, (await matchTitles(env, [title], requestBudget())).found.get(title));
       const item = await insertItem(db, { ...fields, list_id: list.id, title, status }, now, { checkLimit: true }).first<ItemRow>();
       if (!item) throw new HttpError(409, 'Already in the list'); // the same title came in meanwhile
       return item;
@@ -764,7 +875,7 @@ const handleApi = async (request: Request, env: Env, channelId: string, route: s
       if (existing.results.length + titles.length > MAX_ITEMS_PER_LIST) throw new HttpError(409, `At most ${MAX_ITEMS_PER_LIST} items`);
       if (!titles.length) return { added: [], skipped: body.titles.length };
 
-      const { found, unchecked } = await matchTitles(env, list.kind === 'movies' ? titles : []);
+      const { found, unchecked } = await matchTitles(env, list.kind === 'movies' ? titles : [], requestBudget());
       const results = await db.batch<ItemRow>(
         titles.map((title) => insertItem(db, { ...found.get(title), list_id: list.id, title, status, source }, now)),
       );
@@ -786,7 +897,7 @@ const handleApi = async (request: Request, env: Env, channelId: string, route: s
       // The title was corrected and no poster was picked by hand: look it up again (clears a wrong poster too).
       if (fields.title !== undefined && fields.title !== item.title && !('tmdb_id' in body) && !('poster_path' in body)) {
         const list = await getOwnedList(db, channelId, item.list_id);
-        const movie = list.kind === 'movies' ? (await matchTitles(env, [fields.title])).found.get(fields.title) : undefined;
+        const movie = list.kind === 'movies' ? (await matchTitles(env, [fields.title], requestBudget())).found.get(fields.title) : undefined;
         Object.assign(fields, { tmdb_id: null, year: null, poster_path: null, tmdb_type: null }, movie);
       }
 

@@ -38,6 +38,13 @@ const seedChannel = async (channel: string) => {
 };
 
 type Seeded = Awaited<ReturnType<typeof seedChannel>>;
+/** Every row that belongs to one channel. */
+const dumpChannel = async (channel: string) => ({
+  lists: await w.all('SELECT * FROM lists WHERE channel_id = ? ORDER BY id', channel),
+  items: await w.all('SELECT items.* FROM items JOIN lists ON lists.id = items.list_id WHERE channel_id = ? ORDER BY items.id', channel),
+  pending: await w.all('SELECT p.* FROM pending_lots p JOIN lists ON lists.id = p.list_id WHERE channel_id = ? ORDER BY p.id', channel),
+  channel: await w.all('SELECT * FROM channels WHERE channel_id = ?', channel),
+});
 /** Every broadcaster route but the two read-only GETs of the viewer; the body is a valid one for channel `t`. */
 const writeRoutes = (t: Seeded): [string, string, unknown?][] => [
   ['PUT', '/api/theme', { preset: 'ice' }],
@@ -68,6 +75,7 @@ describe('auth', () => {
   const routes = ['/api/channel', '/api/viewer/channel', '/api/movie/550'];
 
   it('answers 401 without a valid token and touches nothing', async () => {
+    w.clock.auto = false; // the crafted tokens below live a minute
     const payload = { exp: nowS() + 60, channel_id: 'auth', role: 'broadcaster', user_id: 'u1' };
     const header = { alg: 'HS256', typ: 'JWT' };
     const [, , foreignSignature] = craftJwt(header, { ...payload, channel_id: 'other' }).split('.');
@@ -97,6 +105,7 @@ describe('auth', () => {
     expect(await w.dump()).toEqual(before);
     // Control: the same payload, signed properly.
     expect((await w.call('GET', '/api/channel', { auth: `Bearer ${craftJwt(header, payload)}` })).status).toBe(200);
+    w.clock.auto = true;
   });
 
   it('answers a CORS preflight without a token', async () => {
@@ -145,7 +154,7 @@ describe('roles and channel isolation', () => {
       ['DELETE', `/api/items/${a.items[1]}`],
       ['DELETE', `/api/lists/${a.list}`],
     ];
-    const before = await w.dump();
+    const before = await dumpChannel('iso-a');
     for (const [method, path, body] of foreign) {
       const response = await w.call(method, path, { channel: 'iso-b', body });
       expect(response.status, `${method} ${path}`).toBe(404);
@@ -155,7 +164,7 @@ describe('roles and channel isolation', () => {
     expect((await w.call('DELETE', `/api/pending/${a.pending}`, { channel: 'iso-b' })).status).toBe(200);
     // Reordering own list with the other channel's item ids moves nothing of theirs.
     await w.call('PUT', `/api/lists/${b.list}/order`, { channel: 'iso-b', body: { ids: [...a.items].reverse() } });
-    expect(await w.dump()).toEqual(before);
+    expect(await dumpChannel('iso-a')).toEqual(before);
   });
 
   it("never returns another channel's data or the Pointauc token", async () => {
@@ -442,6 +451,8 @@ describe('automatic Pointauc sync', () => {
     const { list } = await w.seedList('cron', 'movies');
     await w.connectPointauc('cron', list.id, 'token-cron-0000');
     w.pointauc.set('token-cron-0000', [{ id: 'L1', name: 'Heat', amount: 3 }]);
+    // The cron takes a few channels at random: leave only this one synced.
+    await w.db.prepare("UPDATE channels SET pointauc_list_id = NULL WHERE channel_id <> 'cron'").run();
     const out = await w.scheduled();
     expect(out.some((call) => call.kind === 'pointauc' && call.auth === 'token-cron-0000')).toBe(true);
     expect(await w.all('SELECT title FROM items WHERE list_id = ?', list.id)).toEqual([{ title: 'Heat' }]);

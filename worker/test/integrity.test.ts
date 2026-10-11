@@ -225,7 +225,10 @@ describe('Pointauc token key', () => {
     const { list } = await w.seedList('old-key', 'movies');
     const stored = await encryptText('token-old-0000', btoa('o'.repeat(32)));
     await w.db
-      .prepare("INSERT INTO channels (channel_id, pointauc_token, pointauc_list_id) VALUES ('old-key', ?, ?)")
+      .prepare(
+        `INSERT INTO channels (channel_id, pointauc_token, pointauc_list_id) VALUES ('old-key', ?1, ?2)
+         ON CONFLICT (channel_id) DO UPDATE SET pointauc_token = ?1, pointauc_list_id = ?2`,
+      )
       .bind(stored, list.id)
       .run();
     w.pointauc.set('token-old-0000', []);
