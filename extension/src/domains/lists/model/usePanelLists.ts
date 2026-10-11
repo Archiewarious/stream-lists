@@ -6,6 +6,9 @@ import { fromChannelLists, parseSnapshot, type PanelList } from '@domains/lists/
 import { callWorker } from '@shared/api/workerApi';
 import { twitchApi } from '@shared/twitch/twitchApi';
 
+// How long to wait for Twitch's configuration before showing the empty state.
+const CONFIG_WAIT_MS = 1500;
+
 /**
  * Viewer lists. The snapshot from the Twitch config shows up instantly and follows PubSub updates;
  * the full lists (whole history, search) are fetched from the Worker only when the viewer needs them.
@@ -27,7 +30,19 @@ export const usePanelLists = () => {
       setFull(null);
     };
     twitchApi.onConfigChanged(() => applySnapshot(twitchApi.getBroadcasterConfig()));
-    return twitchApi.listenBroadcast(applySnapshot);
+
+    // Twitch announces the configuration once and does not repeat it for a late subscriber (the panel re-created
+    // by "as viewer", or a page that mounted after the announcement): read what is there right away.
+    const initial = twitchApi.getBroadcasterConfig();
+    let giveUpTimer: number | undefined;
+    if (initial !== undefined) applySnapshot(initial);
+    else giveUpTimer = window.setTimeout(() => setSnapshotLists((current) => current ?? []), CONFIG_WAIT_MS);
+
+    const stopListening = twitchApi.listenBroadcast(applySnapshot);
+    return () => {
+      window.clearTimeout(giveUpTimer);
+      stopListening();
+    };
   }, []);
 
   const loadFull = useCallback(() => {
