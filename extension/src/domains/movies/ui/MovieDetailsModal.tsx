@@ -1,5 +1,5 @@
 import { Loader, Modal } from '@mantine/core';
-import { IconExternalLink, IconStarFilled } from '@tabler/icons-react';
+import { IconStarFilled } from '@tabler/icons-react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -81,17 +81,6 @@ const MovieDetailsModal = ({ target, onClose }: MovieDetailsModalProps) => {
             <p className="text-sm leading-relaxed text-fg">{details.overview ?? t('details.noOverview')}</p>
           )}
 
-          {details && (
-            <a
-              href={details.tmdb_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 text-sm font-bold text-[var(--primary-hi)]"
-            >
-              {t('details.openTmdb')}
-              <IconExternalLink size={14} />
-            </a>
-          )}
           <p className="text-[11px] text-fg-3">{t('details.attribution')}</p>
         </div>
       )}

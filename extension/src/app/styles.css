@@ -206,8 +206,10 @@ body,
   .mantine-Modal-content {
     border-radius: 26px;
   }
+  /* Sticky title: opaque enough that long text scrolling under it stays readable. */
   .mantine-Modal-header {
-    background: transparent;
+    background: color-mix(in srgb, var(--bg) 88%, var(--primary-lo));
+    backdrop-filter: blur(12px);
   }
   .mantine-Popover-dropdown {
     border-radius: 22px;

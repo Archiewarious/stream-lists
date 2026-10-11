@@ -172,7 +172,6 @@
     "streamerRating": "Streamer rating {{rating}}",
     "failed": "Couldn't load the description.",
     "noOverview": "No description.",
-    "openTmdb": "Open on TMDB",
     "attribution": "Data and posters from TMDB. This product is not endorsed or certified by TMDB."
   }
 }
