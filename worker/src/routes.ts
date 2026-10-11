@@ -13,8 +13,8 @@ import {
   type Env,
 } from './config';
 import { encryptText } from './crypto';
-import { HttpError, readBody, readEnum, readMovieFields, readOptionalInt, readStatus, readTitle } from './http';
-import { matchLots, normalizeTitle } from './pointauc';
+import { HttpError, readBody, readEnum, readMovieFields, readOptionalInt, readQuery, readStatus, readTitle, tmdbLanguage } from './http';
+import { knownLots, matchLots, normalizeTitle } from './pointauc';
 import { buildChannelSnapshot } from './publish';
 import { searchItems, VIEWER_FIELDS, VIEWER_PAGE, type ItemRow, type ListRow, type ViewerItem } from './snapshot';
 import {
@@ -24,6 +24,7 @@ import {
   ITEM_ORDER,
   loadChannel,
   loadSettings,
+  loadTitles,
   nextQueuePosition,
   saveSetting,
   type PendingLot,
@@ -77,8 +78,7 @@ export const routes: Record<string, Route> = {
     handle: async ({ request, db, channelId }) => {
       const params = new URL(request.url).searchParams;
       const list = await getOwnedList(db, channelId, params.get('list_id'));
-      const query = params.get('q')?.trim() ?? '';
-      if (!query || query.length > 100) throw new HttpError(400, 'q must be 1–100 characters');
+      const query = readQuery(params);
       // Matched in JS: SQLite's LIKE and lower() know only ASCII letters, and titles are mostly Cyrillic.
       const items = await db
         .prepare(`SELECT ${VIEWER_FIELDS.join(', ')}, status FROM items WHERE list_id = ? ORDER BY ${ITEM_ORDER}`)
@@ -112,7 +112,7 @@ export const routes: Record<string, Route> = {
       if (!env.TMDB_API_KEY) throw new HttpError(503, 'TMDB is not configured');
       const params = new URL(request.url).searchParams;
       const type = params.get('type') === 'tv' ? 'tv' : 'movie';
-      const language = params.get('lang') === 'ru' ? 'ru-RU' : 'en-US';
+      const language = tmdbLanguage(params);
       const isListed = await db
         .prepare(
           `SELECT 1 FROM items JOIN lists ON lists.id = items.list_id
@@ -154,10 +154,8 @@ export const routes: Record<string, Route> = {
         )
         .bind(channelId)
         .all<PendingLot & { lot_id: string }>();
-      const isInList = (lot: PendingLot & { lot_id: string }) =>
-        !!lists
-          .find((list) => list.id === lot.list_id)
-          ?.items.some((item) => item.lot_id === lot.lot_id || normalizeTitle(item.title) === normalizeTitle(lot.name));
+      const inList = new Map(lists.map((list) => [list.id, knownLots(list.items.map((item) => item.lot_id), list.items.map((item) => item.title))]));
+      const isInList = (lot: PendingLot & { lot_id: string }) => !!inList.get(lot.list_id)?.(lot.lot_id, lot.name);
       return {
         lists,
         theme: settings?.theme ? parseTheme(JSON.parse(settings.theme)) : null,
@@ -285,12 +283,12 @@ export const routes: Record<string, Route> = {
       const title = 'title' in body ? readTitle(body.title, MAX_ITEM_TITLE_LENGTH) : row.name;
       const fields = { ...readMovieFields(body), ...(await lookUpTyped(env, list, title, body)) };
 
-      const existing = await db.prepare('SELECT title FROM items WHERE list_id = ?').bind(list.id).all<{ title: string }>();
-      if (existing.results.some((item) => normalizeTitle(item.title) === normalizeTitle(title))) {
+      const existing = await loadTitles(db, list.id);
+      if (existing.has(title)) {
         await db.prepare("UPDATE pending_lots SET status = 'dismissed' WHERE id = ?").bind(row.id).run(); // the list has it already
         return { ok: true, added: false };
       }
-      if (existing.results.length >= MAX_ITEMS_PER_LIST) throw new HttpError(409, `At most ${MAX_ITEMS_PER_LIST} items`);
+      if (existing.count >= MAX_ITEMS_PER_LIST) throw new HttpError(409, `At most ${MAX_ITEMS_PER_LIST} items`);
       const item = { ...fields, list_id: list.id, title, status: 'queue', source: 'pointauc', points: row.points, lot_id: row.lot_id } as const;
       // Closed once its item is in the list — not when the insert was skipped because the list filled up meanwhile.
       const close = db
@@ -320,10 +318,9 @@ export const routes: Record<string, Route> = {
   'GET /api/tmdb/search': {
     handle: async ({ request, env }) => {
       const params = new URL(request.url).searchParams;
-      const query = params.get('q')?.trim() ?? '';
-      if (!query || query.length > 100) throw new HttpError(400, 'q must be 1–100 characters');
+      const query = readQuery(params);
       if (!env.TMDB_API_KEY) throw new HttpError(503, 'TMDB is not configured');
-      const language = params.get('lang') === 'ru' ? 'ru-RU' : 'en-US';
+      const language = tmdbLanguage(params);
       try {
         return await searchTmdb(query, language, env.TMDB_API_KEY);
       } catch (error) {
@@ -443,9 +440,9 @@ export const routes: Record<string, Route> = {
       const status = readStatus(body.status);
       const fields = readMovieFields(body);
       // Checked before TMDB (no lookup for nothing). The panel checks the title too, but against the list it loaded.
-      const existing = await db.prepare('SELECT title FROM items WHERE list_id = ?').bind(list.id).all<{ title: string }>();
-      if (existing.results.some((item) => normalizeTitle(item.title) === normalizeTitle(title))) throw new HttpError(409, 'Already in the list');
-      if (existing.results.length >= MAX_ITEMS_PER_LIST) throw new HttpError(409, `At most ${MAX_ITEMS_PER_LIST} items`);
+      const existing = await loadTitles(db, list.id);
+      if (existing.has(title)) throw new HttpError(409, 'Already in the list');
+      if (existing.count >= MAX_ITEMS_PER_LIST) throw new HttpError(409, `At most ${MAX_ITEMS_PER_LIST} items`);
       Object.assign(fields, await lookUpTyped(env, list, title, body));
       const item = await insertItem(db, { ...fields, list_id: list.id, title, status }, now, { checkLimit: true }).first<ItemRow>();
       if (!item) throw new HttpError(409, 'Already in the list'); // the same title came in meanwhile
@@ -465,16 +462,17 @@ export const routes: Record<string, Route> = {
         throw new HttpError(400, `titles must be an array of at most ${MAX_BULK_ITEMS}`);
       }
 
-      const existing = await db.prepare('SELECT title FROM items WHERE list_id = ?').bind(list.id).all<{ title: string }>();
-      const seen = new Set(existing.results.map((item) => normalizeTitle(item.title)));
+      const existing = await loadTitles(db, list.id);
+      const pasted = new Set<string>();
       const titles: string[] = [];
       for (const value of body.titles) {
         const title = readTitle(value, MAX_ITEM_TITLE_LENGTH);
-        if (seen.has(normalizeTitle(title))) continue;
-        seen.add(normalizeTitle(title));
+        const key = normalizeTitle(title);
+        if (existing.has(title) || pasted.has(key)) continue;
+        pasted.add(key);
         titles.push(title);
       }
-      if (existing.results.length + titles.length > MAX_ITEMS_PER_LIST) throw new HttpError(409, `At most ${MAX_ITEMS_PER_LIST} items`);
+      if (existing.count + titles.length > MAX_ITEMS_PER_LIST) throw new HttpError(409, `At most ${MAX_ITEMS_PER_LIST} items`);
       if (!titles.length) return { added: [], skipped: body.titles.length };
 
       const { found, unchecked } = await matchTitles(env, list.kind === 'movies' ? titles : [], requestBudget());

@@ -2,6 +2,7 @@
 
 import { MAX_ITEMS_PER_LIST } from './config';
 import { HttpError } from './http';
+import { normalizeTitle } from './pointauc';
 import type { ChannelList, ItemRow, ListRow } from './snapshot';
 import { parseTheme, type ChannelTheme } from './theme';
 
@@ -11,6 +12,13 @@ export const ITEM_ORDER = `CASE WHEN items.status = 'queue' THEN -COALESCE(items
   CASE WHEN items.status = 'queue' THEN items.position ELSE -items.watched_at END, items.id DESC`;
 
 export type PendingLot = { id: number; list_id: number; name: string; points: number | null };
+
+/** A list's titles as the duplicate check compares them, and how many items it has. */
+export const loadTitles = async (db: D1Database, listId: number) => {
+  const rows = (await db.prepare('SELECT title FROM items WHERE list_id = ?').bind(listId).all<{ title: string }>()).results;
+  const keys = new Set(rows.map((row) => normalizeTitle(row.title)));
+  return { count: rows.length, has: (title: string) => keys.has(normalizeTitle(title)) };
+};
 
 export const loadChannel = async (db: D1Database, channelId: string): Promise<ChannelList[]> => {
   const [lists, items] = await db.batch([

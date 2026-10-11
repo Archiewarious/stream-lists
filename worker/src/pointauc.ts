@@ -20,6 +20,13 @@ export interface ImportLot extends PointaucLot {
 /** How titles are compared: case, ё/е, extra spaces and Unicode composition do not matter. */
 export const normalizeTitle = (title: string) => title.normalize('NFC').toLowerCase().replace(/ё/g, 'е').replace(/\s+/g, ' ').trim();
 
+/** Whether a lot is among known ones: by lot id, or by title, as ids change when the Pointauc tab is reloaded. */
+export const knownLots = (ids: (string | null)[], titles: string[]) => {
+  const idSet = new Set(ids);
+  const titleSet = new Set(titles.map(normalizeTitle));
+  return (id: string, title: string) => idSet.has(id) || titleSet.has(normalizeTitle(title));
+};
+
 /** The first `max` characters of a title, without cutting a character that takes two UTF-16 units (emoji) in half. */
 export const clipTitle = (title: string, max: number) => (title.length <= max ? title : Array.from(title).slice(0, max).join(''));
 

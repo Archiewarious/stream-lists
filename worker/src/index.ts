@@ -32,7 +32,7 @@ export default {
       const publishes = typeof route.publishes === 'function' ? route.publishes(data) : route.publishes;
       if (publishes) {
         // The lists changed: the next sync pass looks at them again even if Pointauc answers the same lots.
-        await env.DB.prepare('UPDATE channels SET pointauc_lots_hash = NULL WHERE channel_id = ?').bind(claims.channel_id).run();
+        await env.DB.prepare('UPDATE channels SET pointauc_lots_hash = NULL WHERE channel_id = ? AND pointauc_lots_hash IS NOT NULL').bind(claims.channel_id).run();
         ctx.waitUntil(publishSnapshot(env, claims.channel_id));
       }
       return json(data);

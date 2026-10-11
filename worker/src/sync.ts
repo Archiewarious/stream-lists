@@ -16,7 +16,7 @@ import {
 import { decryptText } from './crypto';
 import { base64ToBytes } from './base64';
 import { HttpError } from './http';
-import { normalizeTitle, planLotSync, toPointaucLots, type LotSyncPlan, type PointaucLot } from './pointauc';
+import { knownLots, planLotSync, toPointaucLots, type LotSyncPlan, type PointaucLot } from './pointauc';
 import { publishSnapshot } from './publish';
 import type { ItemRow, ListRow } from './snapshot';
 import { insertItem } from './store';
@@ -77,16 +77,11 @@ type HiddenLot = { id: number; lot_id: string; name: string; seen_at: number | n
  * every few seconds.
  */
 const matchHidden = (db: D1Database, hidden: HiddenLot[], lots: PointaucLot[], now: number) => {
-  const has = (ids: Set<string>, titles: Set<string>, id: string, name: string) => ids.has(id) || titles.has(normalizeTitle(name));
-  const hiddenIds = new Set(hidden.map((lot) => lot.lot_id));
-  const hiddenTitles = new Set(hidden.map((lot) => normalizeTitle(lot.name)));
-  const lotIds = new Set(lots.map((lot) => lot.id));
-  const lotTitles = new Set(lots.map((lot) => normalizeTitle(lot.name)));
-  const seen = hidden
-    .filter((lot) => has(lotIds, lotTitles, lot.lot_id, lot.name) && (lot.seen_at ?? 0) < now - DAY_MS)
-    .map((lot) => lot.id);
+  const isHiddenLot = knownLots(hidden.map((lot) => lot.lot_id), hidden.map((lot) => lot.name));
+  const inAuction = knownLots(lots.map((lot) => lot.id), lots.map((lot) => lot.name));
+  const seen = hidden.filter((lot) => inAuction(lot.lot_id, lot.name) && (lot.seen_at ?? 0) < now - DAY_MS).map((lot) => lot.id);
   return {
-    isHidden: (lot: PointaucLot) => has(hiddenIds, hiddenTitles, lot.id, lot.name),
+    isHidden: (lot: PointaucLot) => isHiddenLot(lot.id, lot.name),
     markSeen: seen.length
       ? db.prepare('UPDATE pending_lots SET seen_at = ? WHERE id IN (SELECT value FROM json_each(?))').bind(now, JSON.stringify(seen))
       : null,
@@ -212,9 +207,8 @@ export const autoSyncChannel = async (env: Env, channelId: string, listId: numbe
       .all<HiddenLot & { points: number | null; status: 'pending' | 'dismissed' }>(),
   ]);
   // New: lots neither in the list (by lot or title) nor seen before in "pending" (by lot or title).
-  const seenIds = new Set(pending.results.map((lot) => lot.lot_id));
-  const seenTitles = new Set(pending.results.map((lot) => normalizeTitle(lot.name)));
-  const unseen = lots.filter((lot) => !seenIds.has(lot.id) && !seenTitles.has(normalizeTitle(lot.name)));
+  const isSeen = knownLots(pending.results.map((lot) => lot.lot_id), pending.results.map((lot) => lot.name));
+  const unseen = lots.filter((lot) => !isSeen(lot.id, lot.name));
   const plan = planLotSync(lots, items, new Set(unseen.map((lot) => lot.id)));
   const fresh = plan.toAdd;
 
