@@ -28,7 +28,17 @@ export default defineConfig(({ mode }) => {
     // Tests read styles.css as text (the default theme there must match PRESETS.fox); other CSS stays empty in tests.
     test: { css: { include: [/app\/styles\.css/] } },
     build: {
-      rolldownOptions: { input: { panel: 'panel.html', config: 'config.html' } },
+      // Twitch review wants readable JavaScript, and libraries not mixed into minified files (guidelines 2.5, 2.6).
+      minify: false,
+      rolldownOptions: {
+        input: { panel: 'panel.html', config: 'config.html' },
+        output: {
+          // The chunk with React and the libraries both pages share gets a plain name; the others keep their module's.
+          chunkFileNames: (chunk) =>
+            chunk.moduleIds.some((id) => id.includes('/node_modules/react-dom/')) ? 'assets/vendor-[hash].js' : 'assets/[name]-[hash].js',
+          assetFileNames: (asset) => (asset.names.some((name) => name.endsWith('.css')) ? 'assets/styles-[hash][extname]' : 'assets/[name]-[hash][extname]'),
+        },
+      },
     },
   };
 });
