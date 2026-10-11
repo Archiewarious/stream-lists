@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <title>Stream Lists — review assets</title>
-<!-- Renders the Twitch review images; open with #panels, #logo or #discovery and screenshot the viewport. -->
+<!-- Renders the Twitch review images; open with #panels, #editing, #logo or #discovery in a window of the right size and screenshot the viewport. -->
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800&family=Great+Vibes&display=swap" rel="stylesheet" />
 <style>
   * { box-sizing: border-box; margin: 0; }
@@ -16,15 +16,15 @@
   .view { display: none; }
   .script { font-family: 'Great Vibes', cursive; font-weight: 400; line-height: 1; text-shadow: 0 0 18px rgb(242 144 255 / 0.55); }
 
-  /* 1024×768: three panel states */
-  #panels { width: 1024px; height: 768px; padding: 34px 35px 0; }
-  #panels h1 { font-size: 64px; text-align: center; }
-  #panels p.sub { text-align: center; font-weight: 700; color: rgb(255 240 255 / 0.72); margin: 6px 0 26px; font-size: 17px; }
-  #panels .row { display: flex; gap: 20px; justify-content: center; }
-  #panels figure { width: 300px; }
-  #panels img { width: 300px; height: 472px; border-radius: 16px; display: block;
+  /* 1280×960: three real panels (318×500, as Twitch draws them), captions in English */
+  #panels, #editing { width: 1280px; height: 960px; padding: 110px 0 0; }
+  #panels h1, #editing h1 { font-size: 72px; text-align: center; }
+  #panels p.sub, #editing p.sub { text-align: center; font-weight: 700; color: rgb(255 240 255 / 0.72); margin: 8px 0 44px; font-size: 20px; }
+  #panels .row, #editing .row { display: flex; gap: 40px; justify-content: center; }
+  #panels figure, #editing figure { width: 318px; }
+  #panels img, #editing img { width: 318px; height: 500px; border-radius: 16px; display: block;
     box-shadow: 0 0 0 1px rgb(242 208 255 / 0.28), 0 18px 40px rgb(0 0 0 / 0.45); }
-  #panels figcaption { text-align: center; font-weight: 800; font-size: 15px; margin-top: 14px; color: rgb(255 240 255 / 0.8); }
+  #panels figcaption, #editing figcaption { text-align: center; font-weight: 800; font-size: 17px; margin-top: 18px; color: rgb(255 240 255 / 0.85); }
 
   /* 100×100 logo */
   #logo { width: 100px; height: 100px; position: relative; overflow: hidden;
@@ -52,11 +52,21 @@
 <body>
   <section id="panels" class="view">
     <h1 class="script">Stream Lists</h1>
-    <p class="sub">Очередь фильмов и игр стримера — прямо под стримом</p>
+    <p class="sub">A streamer's movie and game queue, right under the stream</p>
     <div class="row">
-      <figure><img src="raw-panel-queue.png" alt="" /><figcaption>Что смотрим дальше</figcaption></figure>
-      <figure><img src="raw-panel-watched.png" alt="" /><figcaption>Что уже посмотрели — по месяцам</figcaption></figure>
-      <figure><img src="raw-panel-search.png" alt="" /><figcaption>«А это уже смотрели?»</figcaption></figure>
+      <figure><img src="raw-panel-queue.png" alt="" /><figcaption>What's next, with auction points</figcaption></figure>
+      <figure><img src="raw-panel-watched.png" alt="" /><figcaption>What was watched, by month</figcaption></figure>
+      <figure><img src="raw-panel-search.png" alt="" /><figcaption>"Have we seen this already?"</figcaption></figure>
+    </div>
+  </section>
+
+  <section id="editing" class="view">
+    <h1 class="script">Stream Lists</h1>
+    <p class="sub">The streamer edits in the panel on the channel, viewers read</p>
+    <div class="row">
+      <figure><img src="raw-edit-queue.png" alt="" /><figcaption>Watched, edit, delete and drag in the queue</figcaption></figure>
+      <figure><img src="raw-edit-rate.png" alt="" /><figcaption>Rate from 1 to 10</figcaption></figure>
+      <figure><img src="raw-card-attribution.png" alt="" /><figcaption>A viewer's movie card, TMDB attribution</figcaption></figure>
     </div>
   </section>
 
