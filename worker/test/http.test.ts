@@ -136,6 +136,12 @@ describe('roles and channel isolation', () => {
       const viewer = await w.call('GET', '/api/viewer/channel', { channel: 'iso-a', role });
       expect(viewer.status).toBe(200);
       expect(viewer.data.lists.map((list: any) => list.id)).toEqual([a.list, a.other]);
+      const page = await w.call('GET', `/api/viewer/items?list_id=${a.list}&status=queue`, { channel: 'iso-a', role });
+      expect(page.data.items.map((item: any) => item.id)).toEqual([a.items[1], a.items[0], a.items[2]]);
+      const search = await w.call('GET', `/api/viewer/search?list_id=${a.list}&q=watched`, { channel: 'iso-a', role });
+      expect(search.data.results.map((item: any) => item.id)).toEqual([a.items[3]]);
+      const snapshot = await w.call('GET', '/api/viewer/snapshot', { channel: 'iso-a', role });
+      expect(snapshot.data.lists.map((list: any) => list.i)).toEqual([a.list, a.other]);
     }
   });
 
@@ -159,6 +165,9 @@ describe('roles and channel isolation', () => {
       const response = await w.call(method, path, { channel: 'iso-b', body });
       expect(response.status, `${method} ${path}`).toBe(404);
       expect(response.published, `${method} ${path}`).toEqual([]);
+    }
+    for (const path of [`/api/viewer/items?list_id=${a.list}&status=queue`, `/api/viewer/search?list_id=${a.list}&q=queue`]) {
+      expect((await w.call('GET', path, { channel: 'iso-b', role: 'viewer' })).status, path).toBe(404);
     }
     // Hiding someone else's pending lot is silently a no-op.
     expect((await w.call('DELETE', `/api/pending/${a.pending}`, { channel: 'iso-b' })).status).toBe(200);
@@ -318,6 +327,9 @@ describe('snapshot publishing', () => {
     for (const [method, path, body] of [
       ['GET', '/api/channel'],
       ['GET', '/api/viewer/channel'],
+      ['GET', `/api/viewer/items?list_id=${list.id}&status=queue`],
+      ['GET', `/api/viewer/search?list_id=${list.id}&q=a`],
+      ['GET', '/api/viewer/snapshot'],
       ['PATCH', `/api/lists/${list.id}`, { kind: 'books' }],
       ['PATCH', '/api/items/99999999', { title: 'x' }],
       // Nothing to look up: match-missing answers { updated: 0 } and stays quiet.
@@ -463,5 +475,57 @@ describe('automatic Pointauc sync', () => {
     const out = await w.scheduled();
     expect(out.some((call) => call.kind === 'pointauc' && call.auth === 'token-cron-0000')).toBe(true);
     expect(await w.all('SELECT title FROM items WHERE list_id = ?', list.id)).toEqual([{ title: 'Heat' }]);
+  });
+});
+
+describe('viewer reads beyond the snapshot', () => {
+  let listId: number;
+  beforeAll(async () => {
+    const { list } = await w.seedList('pages', 'movies', [
+      ...Array.from({ length: 70 }, (_, i) => ({ title: `Очередь ${i}`, points: i % 3 ? i : null, lot_id: `L${i}`, poster_path: '/p.jpg' })),
+      ...Array.from({ length: 40 }, (_, i) => ({ title: `Ёлка ${i}`, status: 'watched', watched_at: 1000 + i, rating: 5 })),
+    ]);
+    listId = list.id;
+  });
+  const viewer = { channel: 'pages', role: 'viewer' };
+
+  it('pages through the queue and the history in display order, with only what the panel shows', async () => {
+    const [full] = (await w.call('GET', '/api/channel', { channel: 'pages' })).data.lists;
+    for (const status of ['queue', 'watched']) {
+      const pages = [];
+      for (const offset of [0, 30, 60]) pages.push((await w.call('GET', `/api/viewer/items?list_id=${listId}&status=${status}&offset=${offset}`, viewer)).data.items);
+      expect(pages.map((page) => page.length)).toEqual(status === 'queue' ? [30, 30, 10] : [30, 10, 0]);
+      expect(pages.flat().map((item: any) => item.id)).toEqual(full.items.filter((item: any) => item.status === status).map((item: any) => item.id));
+    }
+    const [first] = (await w.call('GET', `/api/viewer/items?list_id=${listId}&status=queue`, viewer)).data.items;
+    expect(Object.keys(first).sort()).toEqual(['id', 'points', 'poster_path', 'rating', 'title', 'tmdb_id', 'tmdb_type', 'watched_at', 'year']);
+  });
+
+  it('searches on the server: any case, ё as е, watched first, places in the queue, at most 30', async () => {
+    const [full] = (await w.call('GET', '/api/channel', { channel: 'pages' })).data.lists;
+    const queue = full.items.filter((item: any) => item.status === 'queue');
+    const one = (await w.call('GET', `/api/viewer/search?list_id=${listId}&q=${encodeURIComponent('ОЧЕРЕДЬ 7')}`, viewer)).data;
+    expect(one.results.map((item: any) => [item.title, item.place])).toEqual(
+      queue.filter((item: any) => item.title.startsWith('Очередь 7')).map((item: any) => [item.title, queue.indexOf(item) + 1]),
+    );
+    const many = (await w.call('GET', `/api/viewer/search?list_id=${listId}&q=${encodeURIComponent('е')}`, viewer)).data;
+    expect([many.results.length, many.total]).toEqual([30, 110]);
+    expect(many.results[0]).toMatchObject({ title: 'Ёлка 39', status: 'watched' });
+    const yo = (await w.call('GET', `/api/viewer/search?list_id=${listId}&q=${encodeURIComponent('елка 3')}`, viewer)).data;
+    expect(yo.total).toBe(11);
+  });
+
+  it('serves the snapshot Twitch would get', async () => {
+    const snapshot = (await w.call('GET', '/api/viewer/snapshot', viewer)).data;
+    const [published] = (await w.call('PUT', '/api/theme', { channel: 'pages', body: { preset: 'mint' } })).published;
+    expect({ ...snapshot, th: { preset: 'mint' } }).toEqual(published);
+  });
+
+  it('checks what it is asked', async () => {
+    for (const query of ['status=later', 'status=queue&offset=-1', 'status=queue&offset=1.5', 'status=queue&offset=x']) {
+      expect((await w.call('GET', `/api/viewer/items?list_id=${listId}&${query}`, viewer)).status, query).toBe(400);
+    }
+    expect((await w.call('GET', `/api/viewer/search?list_id=${listId}&q=%20`, viewer)).status).toBe(400);
+    expect((await w.call('GET', `/api/viewer/search?list_id=${listId}&q=${'x'.repeat(101)}`, viewer)).status).toBe(400);
   });
 });

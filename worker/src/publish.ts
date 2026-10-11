@@ -28,6 +28,10 @@ const loadSnapshotLists = async (db: D1Database, channelId: string): Promise<Cha
   });
 };
 
+/** The channel's snapshot as it is in D1 now. */
+export const buildChannelSnapshot = async (db: D1Database, channelId: string) =>
+  buildSnapshot(await loadSnapshotLists(db, channelId), await loadTheme(db, channelId));
+
 /**
  * Sends the channel's snapshot to Twitch (config segment and PubSub). Twitch takes about 20 config writes a minute,
  * so publishes of a channel go out at least SNAPSHOT_PACE_MS apart: the call that gets the next turn waits for it and
@@ -49,7 +53,7 @@ export const publishSnapshot = async (env: Env, channelId: string) => {
   if (turn === null) return;
   if (turn > now) await new Promise((resolve) => setTimeout(resolve, turn - now));
 
-  const content = buildSnapshot(await loadSnapshotLists(db, channelId), await loadTheme(db, channelId));
+  const content = await buildChannelSnapshot(db, channelId);
   const token = await signJwt(
     {
       exp: Math.floor(Date.now() / 1000) + 60,

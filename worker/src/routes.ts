@@ -1,4 +1,4 @@
-// The API, one entry per route: the broadcaster's lists and settings, and the two reads viewers may make.
+// The API, one entry per route: the broadcaster's lists and settings, and the reads viewers may make.
 
 import {
   ITEM_STATUSES,
@@ -10,12 +10,14 @@ import {
   MAX_LISTS,
   MAX_TMDB_LOOKUPS,
   SUBREQUEST_LIMIT,
+  VIEWER_PAGE,
   type Env,
 } from './config';
 import { encryptText } from './crypto';
 import { HttpError, readBody, readEnum, readMovieFields, readOptionalInt, readStatus, readTitle } from './http';
 import { matchLots, normalizeTitle } from './pointauc';
-import type { ItemRow, ListRow } from './snapshot';
+import { buildChannelSnapshot } from './publish';
+import { searchItems, VIEWER_FIELDS, type ItemRow, type ListRow, type ViewerItem } from './snapshot';
 import {
   getOwnedItem,
   getOwnedList,
@@ -51,9 +53,49 @@ interface Route {
 }
 
 export const routes: Record<string, Route> = {
-  // Viewers read the full lists of the channel they are watching (history and search beyond the snapshot) —
-  // without what only the Worker needs (Pointauc lot ids, TMDB retries) and the add dates the panel never shows.
-  // ponytail: one D1 read per viewer request, no edge cache; add caches.default keyed by channel if traffic grows.
+  // The panel shows the snapshot from Twitch and asks for more only as the viewer gets to it: the next page of the
+  // queue or the history, a search. Nothing a viewer reads is the whole channel any more.
+  'GET /api/viewer/items': {
+    viewer: true,
+    handle: async ({ request, db, channelId }) => {
+      const params = new URL(request.url).searchParams;
+      const list = await getOwnedList(db, channelId, params.get('list_id'));
+      const status = readEnum<ItemRow['status']>(params.get('status'), ITEM_STATUSES, 'status');
+      const offset = Number(params.get('offset') ?? 0);
+      if (!Number.isInteger(offset) || offset < 0 || offset > MAX_ITEMS_PER_LIST) throw new HttpError(400, 'Invalid offset');
+      // ponytail: ORDER BY an expression sorts the whole status of the list for every page (≤ 2000 rows read);
+      // an expression index matching ITEM_ORDER if lists get that long and are paged through a lot.
+      const items = await db
+        .prepare(`SELECT ${VIEWER_FIELDS.join(', ')} FROM items WHERE list_id = ? AND status = ? ORDER BY ${ITEM_ORDER} LIMIT ? OFFSET ?`)
+        .bind(list.id, status, VIEWER_PAGE, offset)
+        .all<ViewerItem>();
+      return { items: items.results };
+    },
+  },
+
+  'GET /api/viewer/search': {
+    viewer: true,
+    handle: async ({ request, db, channelId }) => {
+      const params = new URL(request.url).searchParams;
+      const list = await getOwnedList(db, channelId, params.get('list_id'));
+      const query = params.get('q')?.trim() ?? '';
+      if (!query || query.length > 100) throw new HttpError(400, 'q must be 1–100 characters');
+      // Matched in JS: SQLite's LIKE and lower() know only ASCII letters, and titles are mostly Cyrillic.
+      const items = await db
+        .prepare(`SELECT ${VIEWER_FIELDS.join(', ')}, status FROM items WHERE list_id = ? ORDER BY ${ITEM_ORDER}`)
+        .bind(list.id)
+        .all<ViewerItem & Pick<ItemRow, 'status'>>();
+      return searchItems(items.results, query, VIEWER_PAGE);
+    },
+  },
+
+  // The snapshot itself, for a panel that did not get a readable one from Twitch.
+  'GET /api/viewer/snapshot': {
+    viewer: true,
+    handle: async ({ db, channelId }) => JSON.parse(await buildChannelSnapshot(db, channelId)),
+  },
+
+  // The whole channel, as the panel of version 0.0.1 reads it for its history and search.
   'GET /api/viewer/channel': {
     viewer: true,
     handle: async ({ db, channelId }) => {

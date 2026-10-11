@@ -1,3 +1,4 @@
+import { normalizeTitle } from './pointauc';
 import type { ChannelTheme } from './theme';
 
 // The public snapshot viewers read from the Twitch config segment (and receive via PubSub). Both cap at 5 KB.
@@ -93,4 +94,25 @@ export const buildSnapshot = (lists: ChannelList[], theme: ChannelTheme | null =
   }
   // Unreachable while lists are capped (MAX_LISTS × list title length).
   throw new Error('Snapshot exceeds 5 KB even without items');
+};
+
+/** The item fields a viewer's panel shows (the snapshot's, in full). */
+export const VIEWER_FIELDS = ['id', 'title', 'year', 'poster_path', 'watched_at', 'points', 'rating', 'tmdb_id', 'tmdb_type'] as const;
+export type ViewerItem = Pick<ItemRow, (typeof VIEWER_FIELDS)[number]>;
+export type SearchResult = ViewerItem & { status: ItemRow['status']; /** Place in the queue (1-based), queued items only. */ place?: number };
+
+/**
+ * A viewer's search in one list: titles containing the query (case, ё/е and spaces aside), watched first, then the
+ * queue, each with its place in it — the first `limit` of them, and how many there are. `items` in display order.
+ */
+export const searchItems = (items: (ViewerItem & Pick<ItemRow, 'status'>)[], query: string, limit: number) => {
+  const needle = normalizeTitle(query);
+  let place = 0;
+  const found: SearchResult[] = [];
+  for (const item of items) {
+    if (item.status === 'queue') place += 1;
+    if (normalizeTitle(item.title).includes(needle)) found.push(item.status === 'queue' ? { ...item, place } : item);
+  }
+  const ordered = [...found.filter((item) => item.status === 'watched'), ...found.filter((item) => item.status === 'queue')];
+  return { results: ordered.slice(0, limit), total: found.length };
 };
