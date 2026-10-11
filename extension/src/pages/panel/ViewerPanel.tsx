@@ -10,6 +10,7 @@ import { Points, RatingBadge } from '@domains/lists/ui/ItemMeta';
 import ListSwitcher from '@domains/lists/ui/ListSwitcher';
 import PanelSearchResults from '@domains/lists/ui/PanelSearchResults';
 import MovieDetailsModal, { type DetailsTarget } from '@domains/movies/ui/MovieDetailsModal';
+import AuthorCredit from '@shared/ui/AuthorCredit';
 import Poster from '@shared/ui/Poster';
 
 type Tab = 'queue' | 'watched';
@@ -188,6 +189,8 @@ const ViewerPanel = ({ onEdit, lists: liveLists }: ViewerPanelProps) => {
           </ScrollArea>
         </>
       )}
+
+      <AuthorCredit />
 
       <MovieDetailsModal target={details} onClose={() => setDetails(null)} />
     </div>

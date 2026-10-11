@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { ItemRow } from '@worker/snapshot';
+import AuthorCredit from '@shared/ui/AuthorCredit';
 import { matchesTitle } from '@domains/lists/lib/items';
 import { useAddItem } from '@domains/lists/model/useAddItem';
 import type { Channel, ItemStatus } from '@domains/lists/model/useChannel';
@@ -156,6 +157,8 @@ const AuthorPanel = ({ channel, onViewAsViewer }: AuthorPanelProps) => {
           />
         )}
       </ScrollArea>
+
+      <AuthorCredit />
 
       <PendingLotsModal
         opened={isPendingOpened && pendingLots.length > 0}
