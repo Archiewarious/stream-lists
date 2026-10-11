@@ -17,7 +17,7 @@ interface PointaucImportModalProps {
   onConnect: (token: string) => Promise<void>;
   onDisconnect: () => void;
   /** Resolves false when saving failed — the dialog and the selection stay. */
-  onImport: (titles: string[], status: ItemStatus) => Promise<boolean>;
+  onImport: (lotIds: string[], status: ItemStatus) => Promise<boolean>;
 }
 
 const ConnectForm = ({ onConnect }: Pick<PointaucImportModalProps, 'onConnect'>) => {
@@ -101,7 +101,7 @@ const PointaucImportModal = (props: PointaucImportModalProps) => {
   const importSelected = async (status: ItemStatus) => {
     setIsImporting(true);
     const isSaved = await onImport(
-      (lots ?? []).filter((lot) => selected.has(lot.id)).map((lot) => lot.name),
+      (lots ?? []).filter((lot) => selected.has(lot.id)).map((lot) => lot.id),
       status,
     );
     setIsImporting(false);

@@ -82,6 +82,14 @@ const ConfigPage = () => {
     return null;
   };
 
+  const importLots = async (lotIds: string[], status: ItemStatus) => {
+    const result = await channel.importLots(list.id, lotIds, status);
+    if (!result) return false;
+    setNotice(t('config.bulkResult', { added: result.added.length, skipped: result.skipped }));
+    setTimeout(() => setNotice(null), NOTICE_MS);
+    return true;
+  };
+
   const addBulk = async (titles: string[], status: ItemStatus, source: ItemRow['source'] = 'manual') => {
     const result = await channel.addBulk(list.id, titles, status, source);
     if (!result) return false;
@@ -164,7 +172,7 @@ const ConfigPage = () => {
         isConnected={channel.isPointaucConnected}
         onConnect={channel.connectPointauc}
         onDisconnect={channel.disconnectPointauc}
-        onImport={(titles, status) => addBulk(titles, status, 'pointauc')}
+        onImport={importLots}
       />
 
       <Modal

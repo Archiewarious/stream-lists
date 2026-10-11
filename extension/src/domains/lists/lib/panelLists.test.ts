@@ -16,6 +16,10 @@ const item = (id: number, fields: Partial<ItemRow>): ItemRow => ({
   added_at: 0,
   watched_at: null,
   source: 'manual',
+  points: null,
+  lot_id: null,
+  rating: null,
+  tmdb_type: null,
   ...fields,
 });
 
@@ -27,9 +31,9 @@ const channel: ChannelList[] = [
     kind: 'movies',
     created_at: 0,
     items: [
-      item(1, { year: 2014, poster_path: '/a.jpg' }),
+      item(1, { year: 2014, poster_path: '/a.jpg', tmdb_id: 157336, tmdb_type: 'movie', points: 1250 }),
       item(2, {}),
-      item(3, { status: 'watched', watched_at: 1790553600000 }),
+      item(3, { status: 'watched', watched_at: 1790553600000, rating: 8 }),
     ],
   },
 ];

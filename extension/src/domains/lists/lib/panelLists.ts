@@ -1,7 +1,10 @@
 import type { ChannelList, ItemRow, ListRow } from '@worker/snapshot';
 import { parseTheme, type ChannelTheme } from '@worker/theme';
 
-export type PanelItem = Pick<ItemRow, 'id' | 'title' | 'year' | 'poster_path' | 'watched_at'>;
+export type PanelItem = Pick<
+  ItemRow,
+  'id' | 'title' | 'year' | 'poster_path' | 'watched_at' | 'points' | 'rating' | 'tmdb_id' | 'tmdb_type'
+>;
 
 /** What the viewer panel shows: the snapshot may hold only part of the items, the counts are always full. */
 export interface PanelList {
@@ -22,6 +25,10 @@ interface SnapshotItem {
   y?: number;
   p?: string;
   d?: number;
+  b?: number;
+  r?: number;
+  m?: number;
+  k?: 1;
 }
 
 interface SnapshotList {
@@ -40,6 +47,10 @@ const fromSnapshotItem = (item: SnapshotItem): PanelItem => ({
   year: item.y ?? null,
   poster_path: item.p ?? null,
   watched_at: item.d ?? null,
+  points: item.b ?? null,
+  rating: item.r ?? null,
+  tmdb_id: item.m ?? null,
+  tmdb_type: item.m ? (item.k ? 'tv' : 'movie') : null,
 });
 
 export interface PanelSnapshot {
@@ -67,12 +78,16 @@ export const parseSnapshot = (content: string | undefined): PanelSnapshot | null
   }
 };
 
-const toPanelItem = ({ id, title, year, poster_path, watched_at }: ItemRow): PanelItem => ({
+const toPanelItem = ({ id, title, year, poster_path, watched_at, points, rating, tmdb_id, tmdb_type }: ItemRow): PanelItem => ({
   id,
   title,
   year,
   poster_path,
   watched_at,
+  points,
+  rating,
+  tmdb_id,
+  tmdb_type,
 });
 
 /** Full lists from the Worker (items already in display order). */

@@ -3,9 +3,9 @@ import { describe, expect, it } from 'vitest';
 import { signJwt, verifyJwt } from './jwt';
 import { buildSnapshot, getByteSize, SNAPSHOT_LIMIT_BYTES, type ChannelList, type ItemRow } from './snapshot';
 import { decryptText, encryptText } from './crypto';
-import { matchLots, toPointaucLots } from './pointauc';
+import { matchLots, planLotSync, toPointaucLots } from './pointauc';
 import { parseTheme } from './theme';
-import { toTmdbResults } from './tmdb';
+import { pickMatch, searchQueries, toTmdbResults, type TmdbResult } from './tmdb';
 
 const secret = btoa('test-extension-secret-0123456789');
 const exp = Math.floor(Date.now() / 1000) + 60;
@@ -44,6 +44,10 @@ describe('buildSnapshot', () => {
     added_at: 0,
     watched_at: status === 'watched' ? 1_700_000_000_000 - id : null,
     source: 'manual',
+    points: null,
+    lot_id: null,
+    rating: null,
+    tmdb_type: null,
   });
   const list = (items: ItemRow[]): ChannelList => ({ id: 1, channel_id: '123', title: 'Фильмы', kind: 'movies', created_at: 0, items });
 
@@ -76,9 +80,9 @@ describe('toTmdbResults', () => {
       ],
     });
     expect(results).toEqual([
-      { tmdb_id: 693134, title: 'Дюна: Часть вторая', year: 2024, poster_path: '/abc.jpg', type: 'movie' },
-      { tmdb_id: 94605, title: 'Аркейн', year: 2021, poster_path: null, type: 'tv' },
-      { tmdb_id: 2, title: 'Без даты', year: null, poster_path: null, type: 'movie' },
+      { tmdb_id: 693134, title: 'Дюна: Часть вторая', year: 2024, poster_path: '/abc.jpg', type: 'movie', original_title: null },
+      { tmdb_id: 94605, title: 'Аркейн', year: 2021, poster_path: null, type: 'tv', original_title: null },
+      { tmdb_id: 2, title: 'Без даты', year: null, poster_path: null, type: 'movie', original_title: null },
     ]);
   });
 });
@@ -126,5 +130,61 @@ describe('Pointauc', () => {
     expect(stored).not.toContain('pointauc-token');
     expect(await decryptText(stored, key)).toBe('pointauc-token');
     await expect(decryptText(stored, btoa('x'.repeat(32)))).rejects.toThrow();
+  });
+});
+
+describe('pickMatch', () => {
+  const result = (title: string, year: number | null, original: string | null = null): TmdbResult => ({
+    tmdb_id: 1,
+    title,
+    year,
+    poster_path: '/p.jpg',
+    type: 'movie',
+    original_title: original,
+  });
+
+  it('takes only a certain match: same name ignoring case, punctuation and ё', () => {
+    expect(pickMatch('матрица', [result('Матрица: Перезагрузка', 2003), result('Матрица', 1999)])?.year).toBe(1999);
+    expect(pickMatch('Зелёная миля', [result('Зеленая миля', 1999)])?.year).toBe(1999);
+    expect(pickMatch('Матрица 2', [result('Матрица: Перезагрузка', 2003)])).toBeNull();
+    expect(pickMatch('хуй пизда', [result('Пизда', 2010)])).toBeNull();
+    expect(pickMatch('', [result('', null)])).toBeNull();
+  });
+
+  it('knows the original title and a year in brackets', () => {
+    expect(pickMatch('Interstellar', [result('Интерстеллар', 2014, 'Interstellar')])?.year).toBe(2014);
+    expect(pickMatch('Дюна (1984)', [result('Дюна', 2021), result('Дюна', 1984)])?.year).toBe(1984);
+  });
+
+  it('reads a bare trailing year, but a year that is part of the name wins', () => {
+    expect(pickMatch('Интерстеллар 2014', [result('Интерстеллар', 2014)])?.year).toBe(2014);
+    expect(pickMatch('Интерстеллар 2019', [result('Интерстеллар', 2014)])).toBeNull();
+    expect(pickMatch('Бегущий по лезвию 2049', [result('Бегущий по лезвию', 1982), result('Бегущий по лезвию 2049', 2017)])?.year).toBe(2017);
+    expect(searchQueries('Интерстеллар 2014')).toEqual(['Интерстеллар 2014', 'Интерстеллар']);
+    expect(searchQueries('Дюна (1984)')).toEqual(['Дюна']);
+    expect(searchQueries('Матрица')).toEqual(['Матрица']);
+  });
+});
+
+describe('planLotSync', () => {
+  const lots = [
+    { id: 'a', name: 'Матрица', amount: 540 },
+    { id: 'b', name: 'Терминатор 2', amount: 760 },
+    { id: 'c', name: 'терминатор 2', amount: 10 }, // the same title again
+    { id: 'd', name: 'Чужой', amount: 0 },
+  ];
+  const items = [
+    { id: 7, title: 'Матрица', points: null, lot_id: null },
+    { id: 8, title: 'Чужой', points: 0, lot_id: 'd' },
+  ];
+
+  it('refreshes bids of known titles and adds only the chosen new lots, each title once', () => {
+    const plan = planLotSync(lots, items, new Set(['b', 'c']));
+    expect(plan.toUpdate).toEqual([{ id: 7, points: 540, lot_id: 'a' }]);
+    expect(plan.toAdd.map((lot) => lot.id)).toEqual(['b']);
+  });
+
+  it('adds nothing without chosen ids', () => {
+    expect(planLotSync(lots, items, null).toAdd).toEqual([]);
   });
 });

@@ -22,6 +22,12 @@ export interface ItemRow {
   added_at: number;
   watched_at: number | null;
   source: 'manual' | 'pointauc';
+  /** Pointauc bid on the lot this item came from. */
+  points: number | null;
+  lot_id: string | null;
+  /** The streamer's rating, watched items only. */
+  rating: number | null;
+  tmdb_type: 'movie' | 'tv' | null;
 }
 
 /** Items are expected in display order: queue by position, watched newest first. */
@@ -47,6 +53,10 @@ const compactItem = (item: ItemRow) => ({
   y: item.year ?? undefined,
   p: item.poster_path ?? undefined,
   d: item.watched_at ?? undefined,
+  b: item.points || undefined, // bid
+  r: item.rating ?? undefined,
+  m: item.tmdb_id ?? undefined, // TMDB id, for the details card
+  k: item.tmdb_type === 'tv' ? 1 : undefined,
 });
 
 export const getByteSize = (content: string) => new TextEncoder().encode(content).length;

@@ -76,6 +76,20 @@ export const useChannel = () => {
     }
   };
 
+  // Once per list per visit: titles that were added without a poster get one if TMDB knows them for sure.
+  const triedMatching = useRef(new Set<number>());
+  useEffect(() => {
+    const target = lists?.find(
+      (candidate) =>
+        candidate.kind === 'movies' &&
+        !triedMatching.current.has(candidate.id) &&
+        candidate.items.some((item) => !item.poster_path && !item.tmdb_id),
+    );
+    if (!target) return;
+    triedMatching.current.add(target.id);
+    run(() => callWorker('POST', `/api/lists/${target.id}/match-missing`));
+  }, [lists]); // eslint-disable-line react-hooks/exhaustive-deps -- run only reads refs and stable setters
+
   return {
     lists,
     theme,
@@ -120,6 +134,20 @@ export const useChannel = () => {
           source,
         }),
       ),
+
+    /** Imports Pointauc lots by id: the Worker reads them from Pointauc, finds posters and keeps the bids. */
+    importLots: (listId: number, lotIds: string[], status: ItemStatus) =>
+      run(() =>
+        callWorker<{ added: ItemRow[]; skipped: number }>('POST', '/api/pointauc/import', {
+          list_id: listId,
+          lot_ids: lotIds,
+          status,
+        }),
+      ),
+
+    /** Posters for titles that were added without one; resolves with how many were found. */
+    matchMissing: (listId: number) =>
+      run(() => callWorker<{ updated: number }>('POST', `/api/lists/${listId}/match-missing`)),
 
     /** Throws with the Worker's message (bad token, Pointauc tab closed) so the dialog can show it. */
     connectPointauc: async (token: string) => {
