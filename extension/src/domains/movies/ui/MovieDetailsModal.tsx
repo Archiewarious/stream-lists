@@ -34,7 +34,8 @@ const MovieDetailsModal = ({ target, onClose }: MovieDetailsModalProps) => {
     let isCancelled = false;
     const params = new URLSearchParams({ type: target.tmdb_type ?? 'movie', lang: i18n.language });
     callWorker<MovieDetails>('GET', `/api/movie/${target.tmdb_id}?${params}`)
-      .then((nextDetails) => !isCancelled && setDetails(nextDetails))
+      // Anything but a card (an odd answer) is a failure, not a crash.
+      .then((nextDetails) => !isCancelled && (Array.isArray(nextDetails?.genres) ? setDetails(nextDetails) : setIsFailed(true)))
       .catch(() => !isCancelled && setIsFailed(true));
     return () => {
       isCancelled = true;
@@ -50,7 +51,18 @@ const MovieDetailsModal = ({ target, onClose }: MovieDetailsModalProps) => {
     : [];
 
   return (
-    <Modal opened={!!target} onClose={onClose} fullScreen centered title={<span className="script text-3xl">{target?.title}</span>}>
+    <Modal
+      opened={!!target}
+      onClose={onClose}
+      fullScreen
+      centered
+      // Two lines at most: the panel is 300 px high and the title stays on top while the text scrolls.
+      title={
+        <span className="script line-clamp-2 text-3xl" title={target?.title}>
+          {target?.title}
+        </span>
+      }
+    >
       {target && (
         <div className="flex flex-col gap-3 pb-2">
           <div className="flex gap-3">
@@ -59,13 +71,13 @@ const MovieDetailsModal = ({ target, onClose }: MovieDetailsModalProps) => {
               {facts.length > 0 && <span className="font-bold text-fg-2">{facts.join(' · ')}</span>}
               {details && details.genres.length > 0 && <span className="text-fg-2">{details.genres.join(', ')}</span>}
               <div className="flex flex-wrap items-center gap-2">
-                {details?.rating && (
-                  <span className="chip chip-queue inline-flex items-center gap-1">
+                {details?.rating != null && (
+                  <span className="chip inline-flex items-center gap-1">
                     <IconStarFilled size={11} />
                     {details.rating.toLocaleString(i18n.language)} TMDB
                   </span>
                 )}
-                {target.rating && <span className="chip chip-new">{t('details.streamerRating', { rating: target.rating })}</span>}
+                {target.rating != null && <span className="chip chip-new">{t('details.streamerRating', { rating: target.rating })}</span>}
               </div>
             </div>
           </div>

@@ -13,7 +13,8 @@ export default defineConfig(({ mode }) => {
   return {
     base: './', // Twitch CDN serves the build from a versioned subpath
     plugins: [react(), tailwindcss(), isTwitchMode && basicSsl()],
-    server: { port: isTwitchMode ? 8080 : 5173, strictPort: true, fs: { allow: ['..'] } }, // ../worker/src
+    // Only the shared Worker code is served from outside extension/ (never worker/.dev.vars with its secrets).
+    server: { port: isTwitchMode ? 8080 : 5173, strictPort: true, fs: { allow: ['.', '../worker/src'], deny: ['**/.dev.vars'] } },
     resolve: {
       alias: {
         '@app': '/src/app',
@@ -24,6 +25,8 @@ export default defineConfig(({ mode }) => {
       '@worker': fileURLToPath(new URL('../worker/src', import.meta.url)), // shared types, snapshot and JWT code
       },
     },
+    // Tests read styles.css as text (the default theme there must match PRESETS.fox); other CSS stays empty in tests.
+    test: { css: { include: [/app\/styles\.css/] } },
     build: {
       rolldownOptions: { input: { panel: 'panel.html', config: 'config.html' } },
     },

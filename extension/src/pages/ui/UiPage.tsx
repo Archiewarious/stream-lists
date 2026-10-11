@@ -77,7 +77,7 @@ const UiPage = () => {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <span className="chip chip-seen">Смотрели 18 сент</span>
-          <span className="chip chip-queue">В очереди · 7</span>
+          <span className="chip">В очереди · 7</span>
           <span className="chip chip-new">Новый</span>
           <span className="label ml-2">Сентябрь 2026</span>
         </div>

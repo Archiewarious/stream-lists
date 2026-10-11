@@ -43,7 +43,12 @@
     "noListsAuthor": "No lists yet. Create the first one in the extension settings.",
     "viewAsViewer": "What viewers see",
     "pointaucSettings": "Pointauc: connect and lots",
-    "backToEdit": "Back to editing"
+    "backToEdit": "Back to editing",
+    "loading": "Loading",
+    "loadFailed": "Couldn't load.",
+    "retry": "Retry",
+    "refine": "The first {{count}} are shown — type more to narrow it down",
+    "creditLink": "Archiewarious — Twitch channel, opens in a new tab"
   },
   "config": {
     "yourLists": "Your lists",
@@ -78,7 +83,11 @@
     "duplicateQueue": "Already in the queue · {{position}}",
     "duplicateWatched": "Already there: {{status}}",
     "addShort": "Add to the queue",
-    "addShortWatched": "Add to watched"
+    "addShortWatched": "Add to watched",
+    "loading": "Loading the lists",
+    "addFailed": "Not added — try again",
+    "bulkPlaceholder": "The Matrix\nTroy\nAlien",
+    "bulkUnchecked": "Posters for {{count}} will follow shortly."
   },
   "movies": {
     "searchPlaceholder": "Find a movie — poster and year come along",
@@ -101,7 +110,7 @@
         "hint": "default"
       },
       "twitch": {
-        "name": "Twitch",
+        "name": "Violet",
         "hint": "classic purple"
       },
       "sunset": {
@@ -131,7 +140,7 @@
     "step2": "Settings → API → Show Token, copy the token",
     "step3": "Paste it here",
     "token": "Pointauc token",
-    "tokenSafety": "The token is stored encrypted on our server and never shown to viewers",
+    "tokenSafety": "The token gives full access to your Pointauc; we only read the lots with it. It is stored encrypted on our server and never shown to viewers. To revoke it: \"Disconnect Pointauc\" here, or a new token in the Pointauc settings.",
     "connect": "Connect",
     "connected": "Pointauc connected",
     "changeToken": "Change token",
@@ -142,14 +151,17 @@
     "empty": "No lots in the auction yet",
     "noRepeats": "Watched and queued titles are not added twice",
     "autoSync": "Add new lots automatically",
-    "autoSyncHint": "Once a minute. Titles found in TMDB go to the queue, the rest to \"To review\".",
-    "syncNoAnswer": "Pointauc did not answer right now. Open pointauc.com with the auction — the sync will try again."
+    "autoSyncHint": "Once a minute, while the pointauc.com tab is open. Movies TMDB knows for sure go straight to the queue, other lots to \"To review\".",
+    "syncNoAnswer": "Pointauc did not answer right now. Open pointauc.com with the auction — the sync will try again.",
+    "syncElsewhere": "It is on for \"{{title}}\" now — switching it on here moves it.",
+    "selectedMax": "At most {{max}} lots at once"
   },
   "rating": {
     "set": "Rate",
     "label": "Rating",
     "prompt": "How was it?",
-    "skip": "No rating"
+    "skip": "No rating",
+    "current": "Rated {{rating}} — change"
   },
   "edit": {
     "open": "Edit",
@@ -171,10 +183,41 @@
   },
   "details": {
     "minutes": "{{count}} min",
-    "seasons": "{{count}} seasons",
     "streamerRating": "Streamer rating {{rating}}",
     "failed": "Couldn't load the description.",
     "noOverview": "No description.",
-    "attribution": "Data and posters from TMDB. This product is not endorsed or certified by TMDB."
+    "attribution": "Data and posters from TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB.",
+    "seasons_one": "{{count}} season",
+    "seasons_other": "{{count}} seasons"
+  },
+  "common": {
+    "close": "Close",
+    "crashed": "Something broke.",
+    "reload": "Reload"
+  },
+  "errors": {
+    "duplicate": "Already in the list",
+    "pointaucToken": "The Pointauc token has to be entered again",
+    "pointaucNotConnected": "Pointauc is not connected",
+    "pointaucUnavailable": "Pointauc did not answer — open pointauc.com with your auction",
+    "pointaucTokenFormat": "That doesn't look like a Pointauc token",
+    "itemsLimit": "A list holds at most {{max}} items",
+    "listsLimit": "At most {{max}} lists",
+    "title": "A title is 1 to {{max}} characters",
+    "tmdb": "The TMDB movie database is unavailable right now",
+    "notFound": "It is gone already — the list will refresh",
+    "auth": "Twitch didn't confirm the sign-in — reload the page",
+    "network": "No connection to the server",
+    "timeout": "The server did not answer in time",
+    "badAnswer": "The server sent something unexpected",
+    "server": "Server error ({{status}})"
+  },
+  "dnd": {
+    "handle": "Drag \"{{title}}\"",
+    "instructions": "Space to pick up, arrows to move, space to drop, Escape to cancel.",
+    "picked": "Picked up \"{{title}}\"",
+    "over": "\"{{title}}\" over place {{place}}",
+    "dropped": "\"{{title}}\" dropped at place {{place}}",
+    "cancelled": "Moving \"{{title}}\" was cancelled"
   }
 }

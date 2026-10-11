@@ -1,4 +1,4 @@
-import type { ChannelTheme, ThemePreset } from '@worker/theme';
+import { parseTheme, type ChannelTheme, type ThemePreset } from '@worker/theme';
 
 /** A theme is four colors; glass, chips, glow and the aurora background are derived from them in styles.css. */
 export interface ThemeColors {
@@ -36,11 +36,45 @@ export const getThemeColors = (theme: ChannelTheme | null): ThemeColors => {
   };
 };
 
+/** WCAG relative luminance of #rrggbb. */
+const luminance = (hex: string) => {
+  const [r, g, b] = [1, 3, 5].map((start) => {
+    const channel = parseInt(hex.slice(start, start + 2), 16) / 255;
+    return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+
+const DARK_TEXT = '#140b1f';
+
+/** Text on a button of the given main color: white, or dark where white would not read (a light own color). */
+export const pickOnColor = (hex: string) => {
+  const light = luminance(hex);
+  return (1.05 / (light + 0.05) >= (light + 0.05) / (luminance(DARK_TEXT) + 0.05) ? '#fff' : DARK_TEXT);
+};
+
+const THEME_CACHE = 'stream-lists:theme';
+
 export const applyTheme = (theme: ChannelTheme | null) => {
   const { bg, primaryHi, primaryLo, accent } = getThemeColors(theme);
+  const isCustom = !!theme && !('preset' in theme);
   const { style } = document.documentElement;
   style.setProperty('--bg', bg);
   style.setProperty('--primary-hi', primaryHi);
   style.setProperty('--primary-lo', primaryLo);
   style.setProperty('--accent', accent);
+  // Presets are drawn for white button text and light small text; own colors may be anything (F-019, F-091).
+  style.setProperty('--on-primary', isCustom ? pickOnColor(theme.primary) : '#fff');
+  style.setProperty('--primary-text', isCustom ? `color-mix(in oklab, ${theme.primary}, white 60%)` : primaryHi);
+  try {
+    localStorage.setItem(THEME_CACHE, JSON.stringify(theme));
+  } catch {} // storage blocked: the next visit starts in the default colors
+};
+
+/** The theme of the last visit, painted before anything renders; the real one follows from Twitch or the Worker. */
+export const restoreTheme = () => {
+  try {
+    const cached = parseTheme(JSON.parse(localStorage.getItem(THEME_CACHE) ?? 'null'));
+    if (cached) applyTheme(cached);
+  } catch {}
 };

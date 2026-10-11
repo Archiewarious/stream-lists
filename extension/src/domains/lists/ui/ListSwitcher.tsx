@@ -14,7 +14,7 @@ interface ListSwitcherProps {
 const ListSwitcher = ({ lists, active, onSelect }: ListSwitcherProps) => (
   <Menu position="bottom-start" disabled={lists.length < 2}>
     <Menu.Target>
-      <button type="button" className="script flex min-w-0 items-center gap-1.5 pl-0.5 text-[30px]">
+      <button type="button" className="script flex min-w-0 items-center gap-1.5 pl-0.5 text-[30px]" title={active.title}>
         <span className="truncate leading-[1.2]">{active.title}</span>
         {lists.length > 1 && <IconChevronDown size={14} className="shrink-0 text-fg-2" />}
       </button>

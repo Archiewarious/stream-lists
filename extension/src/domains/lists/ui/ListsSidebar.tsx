@@ -53,7 +53,7 @@ const ListsSidebar = (props: ListsSidebarProps) => {
           <button
             type="button"
             onClick={() => setIsNewListOpened((opened) => !opened)}
-            className="mx-2.5 mt-2 flex items-center gap-2 py-2 text-sm font-bold text-[var(--primary-hi)]"
+            className="mx-2.5 mt-2 flex items-center gap-2 py-2 text-sm font-bold text-[var(--primary-text)]"
           >
             <IconPlus size={18} />
             {t('config.newList')}
@@ -81,12 +81,12 @@ const ListsSidebar = (props: ListsSidebarProps) => {
         {t('appearance.title')}
       </button>
 
-      <div className="flex items-start gap-2 px-2.5 pt-3 text-xs text-fg-3">
+      <div className="flex items-start gap-2 px-2.5 pt-3 text-xs text-fg-3" role={saveError ? 'alert' : 'status'}>
         {saveError ? (
           <>
             <IconAlertTriangle size={15} className="shrink-0 text-[var(--accent)]" />
             <span className="min-w-0 flex-1 text-fg-2">{t('config.saveFailed', { error: saveError })}</span>
-            <button type="button" aria-label={t('config.cancel')} onClick={onDismissError}>
+            <button type="button" aria-label={t('common.close')} onClick={onDismissError}>
               <IconX size={14} />
             </button>
           </>

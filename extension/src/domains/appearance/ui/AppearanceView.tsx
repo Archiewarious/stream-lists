@@ -1,5 +1,6 @@
 import { Title } from '@mantine/core';
 import { useDebouncedCallback } from '@mantine/hooks';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { ChannelList } from '@worker/snapshot';
@@ -26,7 +27,10 @@ const ORB_SHADOW = 'inset 0 2px 3px rgb(255 255 255 / 0.55), inset 0 -4px 8px rg
 const AppearanceView = ({ theme, list, onPreview, onSave }: AppearanceViewProps) => {
   const { t, i18n } = useTranslation();
   const current = theme ?? DEFAULT_THEME;
-  const custom = 'preset' in current ? DEFAULT_CUSTOM : current;
+  const isCustom = !('preset' in current);
+  // The own colors last picked here stay for "Свои цвета" after a preset was tried in between.
+  const [lastCustom, setLastCustom] = useState('preset' in current ? DEFAULT_CUSTOM : current);
+  const custom = 'preset' in current ? lastCustom : current;
   // A color picker fires on every drag step: repaint each time, save once it settles.
   const saveLater = useDebouncedCallback(onSave, { delay: SAVE_DELAY_MS, flushOnUnmount: true });
 
@@ -38,12 +42,13 @@ const AppearanceView = ({ theme, list, onPreview, onSave }: AppearanceViewProps)
 
   const pickColor = (key: 'primary' | 'accent', color: string) => {
     const nextTheme = { ...custom, [key]: color };
+    setLastCustom(nextTheme);
     onPreview(nextTheme);
     saveLater(nextTheme);
   };
 
   return (
-    <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_300px] gap-6 overflow-y-auto px-1 pt-1">
+    <div className="grid min-h-0 flex-1 grid-cols-1 gap-6 overflow-y-auto px-1 pt-1 lg:grid-cols-[minmax(0,1fr)_300px]">
       <div>
         <Title order={1} size={48} className="!leading-[1.25]">
           {t('appearance.title')}
@@ -74,13 +79,16 @@ const AppearanceView = ({ theme, list, onPreview, onSave }: AppearanceViewProps)
 
         <div
           className="glass mt-3.5 flex flex-wrap items-center gap-3 rounded-[18px] p-3.5 text-sm font-bold"
-          style={'preset' in current ? undefined : SELECTED}
+          style={isCustom ? SELECTED : undefined}
         >
-          <button type="button" className="flex-1 text-left" onClick={() => pick(custom)}>
+          <button type="button" className="flex-1 text-left" aria-pressed={isCustom} onClick={() => pick(custom)}>
             {t('appearance.custom')}
           </button>
           {(['primary', 'accent'] as const).map((key) => (
-            <label key={key} className="glass-soft flex cursor-pointer items-center gap-2 rounded-full py-1.5 pr-3 pl-1.5 text-xs text-fg-2">
+            <label
+              key={key}
+              className="glass-soft flex cursor-pointer items-center gap-2 rounded-full py-1.5 pr-3 pl-1.5 text-xs text-fg-2 has-[:focus-visible]:[box-shadow:var(--ring)]"
+            >
               <span className="relative size-6 overflow-hidden rounded-full" style={{ background: custom[key], boxShadow: ORB_SHADOW }}>
                 <input
                   type="color"
@@ -119,7 +127,7 @@ const AppearanceView = ({ theme, list, onPreview, onSave }: AppearanceViewProps)
         </div>
         <div className="mt-3 flex flex-wrap gap-2">
           <span className="chip chip-seen">{t('columns.movies.seenChip', { date: formatDay(Date.now(), i18n.language) })}</span>
-          <span className="chip chip-queue">{t('panel.inQueue', { position: 7 })}</span>
+          <span className="chip">{t('panel.inQueue', { position: 7 })}</span>
           <span className="chip chip-new">{t('appearance.newChip')}</span>
         </div>
       </div>

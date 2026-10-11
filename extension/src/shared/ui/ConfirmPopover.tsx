@@ -14,7 +14,7 @@ const ConfirmPopover = ({ message, confirmLabel, onConfirm, children }: ConfirmP
   const [isOpened, setIsOpened] = useState(false);
 
   return (
-    <Popover opened={isOpened} onChange={setIsOpened} position="bottom-end" width={260}>
+    <Popover opened={isOpened} onChange={setIsOpened} position="bottom-end" width={260} trapFocus>
       <Popover.Target>
         <span className="inline-flex" onClick={() => setIsOpened((opened) => !opened)}>
           {children}
@@ -29,6 +29,7 @@ const ConfirmPopover = ({ message, confirmLabel, onConfirm, children }: ConfirmP
             size="compact-sm"
             variant="light"
             color="red"
+            data-autofocus
             onClick={() => {
               setIsOpened(false);
               onConfirm();

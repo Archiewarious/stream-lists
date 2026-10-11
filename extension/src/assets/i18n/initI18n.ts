@@ -10,10 +10,13 @@ const detectLanguage = () => {
   return language.startsWith('ru') ? 'ru' : 'en';
 };
 
-export const initI18n = () =>
-  i18n.use(initReactI18next).init({
+export const initI18n = () => {
+  const language = detectLanguage();
+  document.documentElement.lang = language; // screen readers pronounce the page in its language
+  return i18n.use(initReactI18next).init({
     resources: { en: { translation: en }, ru: { translation: ru } },
-    lng: detectLanguage(),
+    lng: language,
     fallbackLng: 'en',
     interpolation: { escapeValue: false },
   });
+};

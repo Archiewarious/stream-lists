@@ -11,7 +11,7 @@ export const Points = ({ value }: { value: number | null }) => {
   if (value === null) return null;
 
   return (
-    <span className="inline-flex shrink-0 items-center gap-px text-xs font-extrabold text-[var(--primary-hi)] tabular-nums">
+    <span className="inline-flex shrink-0 items-center gap-px text-xs font-extrabold text-[var(--primary-text)] tabular-nums">
       <IconBolt size={12} />
       {value.toLocaleString(i18n.language)}
     </span>
@@ -38,11 +38,11 @@ export const RatingBadge = ({ rating, onChange }: RatingBadgeProps) => {
   if (!onChange) return badge;
 
   return (
-    <Popover opened={isOpened} onChange={setIsOpened} position="bottom-end" width={190}>
+    <Popover opened={isOpened} onChange={setIsOpened} position="bottom-end" width={190} trapFocus>
       <Popover.Target>
         <button
           type="button"
-          aria-label={t('rating.set')}
+          aria-label={rating ? t('rating.current', { rating }) : t('rating.set')}
           title={t('rating.set')}
           className="inline-flex shrink-0 items-center rounded-md px-1 py-0.5 hover:bg-white/10"
           onClick={() => setIsOpened((opened) => !opened)}
@@ -56,6 +56,8 @@ export const RatingBadge = ({ rating, onChange }: RatingBadgeProps) => {
             <button
               key={value}
               type="button"
+              aria-pressed={value === rating}
+              data-autofocus={value === (rating ?? 1) || undefined}
               className={`rounded-lg py-1.5 text-sm font-extrabold hover:bg-white/10 ${value === rating ? 'selected text-gold' : ''}`}
               onClick={() => {
                 onChange(value === rating ? null : value);
