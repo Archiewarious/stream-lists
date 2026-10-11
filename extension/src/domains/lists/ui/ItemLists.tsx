@@ -23,7 +23,7 @@ import type { ItemRow } from '@worker/snapshot';
 import { formatDay, groupByMonth } from '@domains/lists/lib/items';
 import type { ListKind } from '@domains/lists/model/useChannel';
 import { HIDE_ON_HOVER, SHOW_ON_HOVER } from '@domains/lists/ui/hoverActions';
-import { Points, PointsBar, RatingBadge } from '@domains/lists/ui/ItemMeta';
+import { Points, RatingBadge } from '@domains/lists/ui/ItemMeta';
 import ConfirmPopover from '@shared/ui/ConfirmPopover';
 import Poster from '@shared/ui/Poster';
 
@@ -68,7 +68,7 @@ const EditButton = ({ item, onEdit }: { item: ItemRow; onEdit: ItemActions['onEd
   );
 };
 
-const QueueRow = ({ item, index, kind, isCompact, maxPoints, ...actions }: RowProps & { item: ItemRow; index: number; maxPoints: number }) => {
+const QueueRow = ({ item, index, kind, isCompact, ...actions }: RowProps & { item: ItemRow; index: number }) => {
   const { t } = useTranslation();
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
     id: item.id,
@@ -82,23 +82,24 @@ const QueueRow = ({ item, index, kind, isCompact, maxPoints, ...actions }: RowPr
         isDragging ? 'selected z-10' : ''
       }`}
     >
-      <button
-        ref={setActivatorNodeRef}
-        type="button"
-        className="cursor-grab touch-none text-fg-3 opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
-        {...attributes}
-        {...listeners}
-      >
-        <IconGripVertical size={14} />
-      </button>
+      {item.points === null ? (
+        <button
+          ref={setActivatorNodeRef}
+          type="button"
+          className="cursor-grab touch-none text-fg-3 opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+          {...attributes}
+          {...listeners}
+        >
+          <IconGripVertical size={14} />
+        </button>
+      ) : (
+        <span className="w-3.5 shrink-0" /> // a title with a bid has its place by the bid
+      )}
       <span className="w-4 shrink-0 text-right text-[11px] text-fg-3 tabular-nums">{index + 1}</span>
       <Poster path={item.poster_path} width={24} />
       <span className="flex min-w-0 flex-1 flex-col gap-1">
         <span className="truncate leading-tight">{item.title}</span>
-        <span className="flex min-h-[12px] items-center gap-2 text-[11px] font-semibold text-fg-3">
-          {item.year && <span className="tabular-nums">{item.year}</span>}
-          <PointsBar value={item.points} max={maxPoints} />
-        </span>
+        <span className="min-h-[12px] text-[11px] font-semibold text-fg-3 tabular-nums">{item.year}</span>
       </span>
       <span className={`flex items-center ${HIDE_ON_HOVER}`}>
         <Points value={item.points} />
@@ -142,13 +143,12 @@ export const QueueList = ({ items, onReorder, emptyText, isCompact = false, ...r
   };
 
   if (!items.length) return <p className="px-2 py-6 text-center text-sm text-fg-3">{emptyText}</p>;
-  const maxPoints = Math.max(0, ...items.map((item) => item.points ?? 0));
 
   return (
     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
       <SortableContext items={items.map((item) => item.id)} strategy={verticalListSortingStrategy}>
         {items.map((item, index) => (
-          <QueueRow key={item.id} item={item} index={index} isCompact={isCompact} maxPoints={maxPoints} {...rowProps} />
+          <QueueRow key={item.id} item={item} index={index} isCompact={isCompact} {...rowProps} />
         ))}
       </SortableContext>
     </DndContext>

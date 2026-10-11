@@ -30,7 +30,7 @@ export interface ItemRow {
   tmdb_type: 'movie' | 'tv' | null;
 }
 
-/** Items are expected in display order: queue by position, watched newest first. */
+/** Items are expected in display order: queue by bid (then position), watched newest first. */
 export type ChannelList = ListRow & { items: ItemRow[] };
 
 export const SNAPSHOT_VERSION = '2';

@@ -96,13 +96,16 @@ const readMovieFields = (body: Record<string, unknown>) => {
 
 // --- data access (every query is scoped to the channel from the JWT) ---
 
+// The queue is ordered like the auction: the biggest bid first; titles without a bid (not from Pointauc) follow in the
+// streamer's own order. Watched items: newest first.
 const loadChannel = async (db: D1Database, channelId: string): Promise<ChannelList[]> => {
   const [lists, items] = await db.batch([
     db.prepare('SELECT * FROM lists WHERE channel_id = ? ORDER BY id').bind(channelId),
     db
       .prepare(
         `SELECT items.* FROM items JOIN lists ON lists.id = items.list_id WHERE lists.channel_id = ?
-         ORDER BY CASE WHEN items.status = 'queue' THEN items.position ELSE -items.watched_at END, items.id DESC`,
+         ORDER BY CASE WHEN items.status = 'queue' THEN -COALESCE(items.points, -1) ELSE 0 END,
+                  CASE WHEN items.status = 'queue' THEN items.position ELSE -items.watched_at END, items.id DESC`,
       )
       .bind(channelId),
   ]);

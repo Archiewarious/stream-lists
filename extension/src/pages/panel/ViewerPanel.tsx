@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { formatDay, groupByMonth } from '@domains/lists/lib/items';
 import { checkIsTrimmed, type PanelItem, type PanelList } from '@domains/lists/lib/panelLists';
 import { usePanelLists } from '@domains/lists/model/usePanelLists';
-import { Points, PointsBar, RatingBadge } from '@domains/lists/ui/ItemMeta';
+import { Points, RatingBadge } from '@domains/lists/ui/ItemMeta';
 import ListSwitcher from '@domains/lists/ui/ListSwitcher';
 import PanelSearchResults from '@domains/lists/ui/PanelSearchResults';
 import MovieDetailsModal, { type DetailsTarget } from '@domains/movies/ui/MovieDetailsModal';
@@ -27,7 +27,6 @@ const rowClass = (item: PanelItem) =>
 const QueueRows = ({ list, onOpen }: { list: PanelList; onOpen: OpenDetails }) => {
   const { t } = useTranslation();
   if (!list.queue.length) return <Empty text={t('panel.emptyQueue')} />;
-  const maxPoints = Math.max(0, ...list.queue.map((item) => item.points ?? 0));
 
   return list.queue.map((item, index) => (
     <div
@@ -42,10 +41,7 @@ const QueueRows = ({ list, onOpen }: { list: PanelList; onOpen: OpenDetails }) =
       <Poster path={item.poster_path} width={24} />
       <span className="flex min-w-0 flex-1 flex-col gap-1">
         <span className="truncate leading-tight">{item.title}</span>
-        <span className="flex min-h-[12px] items-center gap-2 text-[11px] font-semibold text-fg-3">
-          {item.year && <span className="tabular-nums">{item.year}</span>}
-          <PointsBar value={item.points} max={maxPoints} />
-        </span>
+        <span className="min-h-[12px] text-[11px] font-semibold text-fg-3 tabular-nums">{item.year}</span>
       </span>
       <Points value={item.points} />
     </div>
