@@ -20,7 +20,7 @@ type OpenDetails = (item: PanelItem) => void;
 
 /** A row is a button when TMDB knows the title: its card opens on click. */
 const rowClass = (item: PanelItem) =>
-  `flex h-[50px] w-full items-center gap-2.5 rounded-xl px-1.5 text-left text-[13px] font-bold ${
+  `flex min-h-[50px] w-full items-center py-1 gap-2.5 rounded-xl px-1.5 text-left text-[13px] font-bold ${
     item.tmdb_id ? 'cursor-pointer hover:selected' : ''
   }`;
 
@@ -40,7 +40,7 @@ const QueueRows = ({ list, onOpen }: { list: PanelList; onOpen: OpenDetails }) =
       <span className="w-3.5 shrink-0 text-right text-[11px] text-fg-3 tabular-nums">{index + 1}</span>
       <Poster path={item.poster_path} width={24} />
       <span className="flex min-w-0 flex-1 flex-col gap-1">
-        <span className="truncate leading-tight">{item.title}</span>
+        <span className="line-clamp-2 leading-tight">{item.title}</span>
         <span className="min-h-[12px] text-[11px] font-semibold text-fg-3 tabular-nums">{item.year}</span>
       </span>
       <Points value={item.points} />
@@ -71,7 +71,7 @@ const WatchedRows = ({ list, onOpen }: { list: PanelList; onOpen: OpenDetails })
             <Poster path={item.poster_path} width={24} />
           </span>
           <span className="flex min-w-0 flex-1 flex-col gap-1">
-            <span className="truncate leading-tight">{item.title}</span>
+            <span className="line-clamp-2 leading-tight">{item.title}</span>
             <span className="min-h-[12px] text-[11px] font-semibold text-fg-3 tabular-nums">{item.year}</span>
           </span>
           <span className="text-[11px] font-semibold text-fg-3">

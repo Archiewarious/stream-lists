@@ -17,7 +17,7 @@
   --tint: color-mix(in oklab, var(--primary-hi), white 35%);
   --text: color-mix(in srgb, var(--tint) 8%, white);
   --text-2: color-mix(in srgb, var(--text) 72%, transparent);
-  --text-3: color-mix(in srgb, var(--text) 48%, transparent);
+  --text-3: color-mix(in srgb, var(--text) 66%, transparent);
 
   --glass: linear-gradient(
     160deg,
@@ -173,6 +173,7 @@ body,
   }
 
   .mantine-Input-input {
+    --input-placeholder-color: var(--text-3);
     color: var(--text);
     font-weight: 600;
   }
@@ -218,6 +219,13 @@ body,
   [data-combobox-option] {
     border-radius: 14px;
     font-weight: 700;
+  }
+
+  /* Native scrollbar of a full-screen card: thin, no arrows poking out of the rounded corners. */
+  .mantine-Modal-content,
+  .mantine-Modal-inner {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--tint) 35%, transparent) transparent;
   }
 
   .mantine-ScrollArea-thumb {

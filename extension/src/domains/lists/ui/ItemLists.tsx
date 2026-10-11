@@ -78,7 +78,7 @@ const QueueRow = ({ item, index, kind, isCompact, ...actions }: RowProps & { ite
     <div
       ref={setNodeRef}
       style={{ transform: CSS.Translate.toString(transform), transition }}
-      className={`group relative flex h-[50px] items-center gap-2 rounded-xl px-1.5 text-[13px] font-bold hover:selected ${
+      className={`group relative flex min-h-[50px] items-center gap-2 py-1 rounded-xl px-1.5 text-[13px] font-bold hover:selected ${
         isDragging ? 'selected z-10' : ''
       }`}
     >
@@ -98,7 +98,7 @@ const QueueRow = ({ item, index, kind, isCompact, ...actions }: RowProps & { ite
       <span className="w-4 shrink-0 text-right text-[11px] text-fg-3 tabular-nums">{index + 1}</span>
       <Poster path={item.poster_path} width={24} />
       <span className="flex min-w-0 flex-1 flex-col gap-1">
-        <span className="truncate leading-tight">{item.title}</span>
+        <span className="line-clamp-2 leading-tight">{item.title}</span>
         <span className="min-h-[12px] text-[11px] font-semibold text-fg-3 tabular-nums">{item.year}</span>
       </span>
       <span className={`flex items-center ${HIDE_ON_HOVER}`}>
@@ -174,12 +174,12 @@ export const WatchedList = ({ items, emptyText, isCompact = false, ...actions }:
         <span className="label">{month.items.length}</span>
       </div>
       {month.items.map((item) => (
-        <div key={item.id} className="group flex h-[50px] items-center gap-2 rounded-xl px-1.5 text-[13px] font-bold hover:selected">
+        <div key={item.id} className="group flex min-h-[50px] items-center gap-2 rounded-xl px-1.5 py-1 text-[13px] font-bold hover:selected">
           <span className="opacity-70">
             <Poster path={item.poster_path} width={24} />
           </span>
           <span className="flex min-w-0 flex-1 flex-col gap-1">
-            <span className="truncate leading-tight">{item.title}</span>
+            <span className="line-clamp-2 leading-tight">{item.title}</span>
             <span className="min-h-[12px] text-[11px] font-semibold text-fg-3 tabular-nums">{item.year}</span>
           </span>
           <span className={`text-xs font-semibold text-fg-3 ${HIDE_ON_HOVER}`}>
