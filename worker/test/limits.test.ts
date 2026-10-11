@@ -103,6 +103,15 @@ describe('sync pacing', () => {
     expect(await w.all('SELECT points FROM items WHERE list_id = ?', list.id)).toEqual([{ points: 7 }]);
   });
 
+  it('looks at the list again after the streamer changes it, though the lots stay the same', async () => {
+    const list = await syncedChannel('typed-in', [{ id: 'L1', name: 'Alien', amount: 500 }]);
+    await w.db.prepare("UPDATE lists SET kind = 'games' WHERE id = ?").bind(list.id).run(); // the lot waits in "pending"
+    await w.call('POST', '/api/pointauc/refresh', { channel: 'typed-in' });
+    await w.call('POST', '/api/items', { channel: 'typed-in', body: { list_id: list.id, title: 'Alien' } });
+    await w.call('POST', '/api/pointauc/refresh', { channel: 'typed-in' });
+    expect(await w.all('SELECT points, lot_id FROM items WHERE list_id = ?', list.id)).toEqual([{ points: 500, lot_id: 'L1' }]);
+  });
+
   it('a pass cut short by the budget is not taken as done', async () => {
     nothingFound();
     const list = await syncedChannel('cut-short', yearLots('C', 30));
