@@ -28,9 +28,9 @@ export const loadChannel = async (db: D1Database, channelId: string): Promise<Ch
 
 export const loadSettings = (db: D1Database, channelId: string) =>
   db
-    .prepare('SELECT theme, pointauc_token, pointauc_list_id FROM channels WHERE channel_id = ?')
+    .prepare('SELECT theme, pointauc_token, pointauc_list_id, pointauc_due_at FROM channels WHERE channel_id = ?')
     .bind(channelId)
-    .first<{ theme: string | null; pointauc_token: string | null; pointauc_list_id: number | null }>();
+    .first<{ theme: string | null; pointauc_token: string | null; pointauc_list_id: number | null; pointauc_due_at: number | null }>();
 
 export const loadTheme = async (db: D1Database, channelId: string): Promise<ChannelTheme | null> => {
   const stored = (await loadSettings(db, channelId))?.theme;

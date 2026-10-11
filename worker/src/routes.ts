@@ -30,7 +30,7 @@ import {
 import { parseTheme } from './theme';
 import { toMovieDetails } from './tmdb';
 import { lookUpTyped, matchTitles, requestBudget, searchTmdb, tmdbRequest } from './tmdbFetch';
-import { autoSyncChannel, fetchPointaucLots, getEncryptionKey, importLots, loadPointaucLots } from './sync';
+import { autoSyncChannel, fetchPointaucLots, getEncryptionKey, importLots, loadHiddenLots, loadPointaucLots, readPointaucToken } from './sync';
 
 export interface RouteContext {
   request: Request;
@@ -91,9 +91,19 @@ export const routes: Record<string, Route> = {
   },
 
   'GET /api/channel': {
-    handle: async ({ db, channelId }) => {
+    handle: async ({ env, db, channelId, now }) => {
       const settings = await loadSettings(db, channelId);
       const lists = await loadChannel(db, channelId);
+      // The streamer is back: an automatic sync that stopped after 30 days without Pointauc's answer starts again.
+      if (settings?.pointauc_token && settings.pointauc_list_id !== null && settings.pointauc_due_at === null) {
+        await db
+          .prepare('UPDATE channels SET pointauc_due_at = ?, pointauc_failing_since = NULL WHERE channel_id = ?')
+          .bind(now, channelId)
+          .run();
+      }
+      // A token saved under another encryption key cannot be used: the window offers to connect again.
+      const isPointaucReadable =
+        !!settings?.pointauc_token && (await readPointaucToken(env, settings.pointauc_token).then(() => true, () => false));
       // Lots TMDB did not know — the streamer decides (the viewer snapshot never contains them). A lot that got into
       // its list another way meanwhile (import, typed by hand) is not offered again.
       const pending = await db
@@ -110,7 +120,7 @@ export const routes: Record<string, Route> = {
       return {
         lists,
         theme: settings?.theme ? parseTheme(JSON.parse(settings.theme)) : null,
-        pointauc: !!settings?.pointauc_token,
+        pointauc: isPointaucReadable,
         pointauc_list_id: settings?.pointauc_list_id ?? null,
         pending: pending.results.filter((lot) => !isInList(lot)).map(({ lot_id, ...lot }) => lot),
       };
@@ -154,7 +164,9 @@ export const routes: Record<string, Route> = {
         .prepare(`SELECT title, status, watched_at FROM items WHERE list_id = ? ORDER BY ${ITEM_ORDER}`) // places as the panel shows them
         .bind(list.id)
         .all<Pick<ItemRow, 'title' | 'status' | 'watched_at'>>();
-      return matchLots(lots, items.results);
+      // A lot the streamer deleted from the list or hid is not offered again (one typed in is in the list again).
+      const isHidden = await loadHiddenLots(db, list.id, lots);
+      return matchLots(lots, items.results).filter((lot) => lot.status !== 'new' || !isHidden(lot));
     },
   },
 
@@ -170,7 +182,9 @@ export const routes: Record<string, Route> = {
         throw new HttpError(400, `lot_ids must be an array of at most ${MAX_BULK_ITEMS} strings`);
       }
       const lots = await loadPointaucLots(env, (await loadSettings(db, channelId))?.pointauc_token);
-      const { added, unchecked } = await importLots(env, list, lots, new Set<string>(lotIds), status);
+      const isHidden = await loadHiddenLots(db, list.id, lots);
+      const addIds = new Set(lots.filter((lot) => lotIds.includes(lot.id) && !isHidden(lot)).map((lot) => lot.id));
+      const { added, unchecked } = await importLots(env, list, lots, addIds, status);
       return { added, skipped: lotIds.length - added.length, unchecked };
     },
   },
@@ -178,7 +192,7 @@ export const routes: Record<string, Route> = {
   // Switches the automatic sync on for one list (or off with list_id: null); the first pass runs right away and
   // publishes by itself.
   'PUT /api/pointauc/sync': {
-    handle: async ({ request, env, db, channelId }) => {
+    handle: async ({ request, env, db, channelId, now }) => {
       const { list_id: listId } = await readBody(request);
       if (listId === null) {
         await saveSetting(db, channelId, 'pointauc_list_id', null);
@@ -187,7 +201,11 @@ export const routes: Record<string, Route> = {
       const stored = (await loadSettings(db, channelId))?.pointauc_token;
       if (!stored) throw new HttpError(409, 'Pointauc is not connected');
       const list = await getOwnedList(db, channelId, listId);
-      await saveSetting(db, channelId, 'pointauc_list_id', list.id);
+      // A fresh start: 30 days of Pointauc's silence before the sync stops again.
+      await db
+        .prepare('UPDATE channels SET pointauc_list_id = ?, pointauc_due_at = ?, pointauc_failing_since = NULL WHERE channel_id = ?')
+        .bind(list.id, now, channelId)
+        .run();
       try {
         await autoSyncChannel(env, channelId, list.id, stored, { left: SUBREQUEST_LIMIT }, true);
         return { ok: true, synced: true };
@@ -246,13 +264,13 @@ export const routes: Record<string, Route> = {
   },
 
   'DELETE /api/pending/:id': {
-    handle: async ({ db, channelId, id }) => {
+    handle: async ({ db, channelId, id, now }) => {
       await db
         .prepare(
-          `UPDATE pending_lots SET status = 'dismissed'
+          `UPDATE pending_lots SET status = 'dismissed', seen_at = ?
            WHERE id = ? AND list_id IN (SELECT id FROM lists WHERE channel_id = ?)`,
         )
-        .bind(id, channelId)
+        .bind(now, id, channelId)
         .run();
       return { ok: true };
     },
@@ -480,8 +498,9 @@ export const routes: Record<string, Route> = {
         statements.unshift(
           db
             .prepare(
-              `INSERT INTO pending_lots (list_id, lot_id, name, points, status, created_at) VALUES (?, ?, ?, ?, 'dismissed', ?)
-               ON CONFLICT (list_id, lot_id) DO UPDATE SET status = 'dismissed'`,
+              `INSERT INTO pending_lots (list_id, lot_id, name, points, status, created_at, seen_at)
+               VALUES (?1, ?2, ?3, ?4, 'dismissed', ?5, ?5)
+               ON CONFLICT (list_id, lot_id) DO UPDATE SET status = 'dismissed', seen_at = ?5`,
             )
             .bind(item.list_id, item.lot_id, item.title, item.points, now),
         );

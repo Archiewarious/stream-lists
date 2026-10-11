@@ -36,3 +36,13 @@ export const CRON_CHANNELS = 4;
 export const AUTO_ADD_MIN_VOTES = 20;
 // Pointauc and TMDB answer in well under a second; one that hangs must not hold a request or the cron run.
 export const OUTSIDE_TIMEOUT_MS = 8000;
+// Pointauc did not answer (its tab is closed): the cron asks again 1, 2, 4… minutes later, at most this rarely, and
+// stops after SYNC_GIVE_UP_MS without an answer — until the streamer opens the panel or the settings window.
+export const SYNC_RETRY_MAX_MS = 60 * 60_000;
+export const SYNC_GIVE_UP_MS = 30 * 24 * 60 * 60_000;
+// A hidden lot (deleted from its list or hidden from "pending") is forgotten once it has not been in the auction this
+// long; the cron deletes a few per run.
+export const HIDDEN_LOT_TTL_MS = 90 * 24 * 60 * 60_000;
+export const HIDDEN_LOTS_PER_RUN = 50;
+// Viewers get the queue and the history beyond the snapshot this many items at a time, and this many search results.
+export const VIEWER_PAGE = 30;

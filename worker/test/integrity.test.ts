@@ -237,3 +237,105 @@ describe('Pointauc token key', () => {
     expect(response.data.error).toBe('Pointauc token must be entered again');
   });
 });
+
+describe('unreadable Pointauc token', () => {
+  it('shows as not connected', async () => {
+    const stored = await encryptText('token-unread-0000', btoa('u'.repeat(32)));
+    await w.db.prepare("INSERT INTO channels (channel_id, pointauc_token) VALUES ('unread', ?)").bind(stored).run();
+    expect((await w.call('GET', '/api/channel', { channel: 'unread' })).data.pointauc).toBe(false);
+    w.pointauc.set('token-unread-0000', []);
+    await w.call('PUT', '/api/pointauc/token', { channel: 'unread', body: { token: 'token-unread-0000' } });
+    expect((await w.call('GET', '/api/channel', { channel: 'unread' })).data.pointauc).toBe(true);
+  });
+
+  it('a missing encryption key does not break the window', async () => {
+    w.pointauc.set('token-nokey-0000', []);
+    await w.call('PUT', '/api/pointauc/token', { channel: 'no-key', body: { token: 'token-nokey-0000' } });
+    const key = w.env.TOKEN_ENCRYPTION_KEY;
+    w.env.TOKEN_ENCRYPTION_KEY = undefined as unknown as string;
+    try {
+      const response = await w.call('GET', '/api/channel', { channel: 'no-key' });
+      expect([response.status, response.data.pointauc]).toEqual([200, false]);
+    } finally {
+      w.env.TOKEN_ENCRYPTION_KEY = key;
+    }
+  });
+});
+
+describe('hidden lots', () => {
+  const lotNames = async (channel: string, listId: number) =>
+    (await w.call('GET', `/api/pointauc/lots?list_id=${listId}`, { channel })).data.map((lot: { name: string }) => lot.name);
+
+  it('the import dialog does not offer a deleted or hidden lot again, even under a new id', async () => {
+    const { list, ids } = await w.seedList('hidden', 'movies', [{ title: 'Heat', lot_id: 'L1', source: 'pointauc' }]);
+    await w.db.prepare("INSERT INTO pending_lots (list_id, lot_id, name, created_at) VALUES (?, 'L2', 'Solaris', 0)").bind(list.id).run();
+    const [{ id: pendingId }] = await w.all<{ id: number }>("SELECT id FROM pending_lots WHERE list_id = ? AND lot_id = 'L2'", list.id);
+    w.pointauc.set('token-hidden-0000', [
+      { id: 'L1', name: 'Heat', amount: 3 },
+      { id: 'L2', name: 'Solaris', amount: 2 },
+      { id: 'L3', name: 'Alien', amount: 1 },
+    ]);
+    await w.call('PUT', '/api/pointauc/token', { channel: 'hidden', body: { token: 'token-hidden-0000' } });
+    await w.call('DELETE', `/api/items/${ids[0]}`, { channel: 'hidden' });
+    await w.call('DELETE', `/api/pending/${pendingId}`, { channel: 'hidden' });
+    expect(await lotNames('hidden', list.id)).toEqual(['Alien']);
+
+    // The Pointauc tab was reloaded: new ids, same titles.
+    w.pointauc.set('token-hidden-0000', [
+      { id: 'N1', name: 'heat', amount: 3 },
+      { id: 'N2', name: 'Solaris', amount: 2 },
+    ]);
+    expect(await lotNames('hidden', list.id)).toEqual([]);
+    const imported = await w.call('POST', '/api/pointauc/import', { channel: 'hidden', body: { list_id: list.id, lot_ids: ['N1', 'N2'] } });
+    expect([imported.data.added, imported.data.skipped]).toEqual([[], 2]);
+
+    // Typed in by hand, it is in the list again — and in the dialog with its place.
+    await w.call('POST', '/api/items', { channel: 'hidden', body: { list_id: list.id, title: 'Heat' } });
+    const lots = (await w.call('GET', `/api/pointauc/lots?list_id=${list.id}`, { channel: 'hidden' })).data;
+    expect(lots.map((lot: { name: string; status: string }) => [lot.name, lot.status])).toEqual([['heat', 'queue']]);
+  });
+
+  it('a hidden lot gone from the auction for 90 days is forgotten; one still there stays', async () => {
+    const { list } = await w.seedList('forget', 'movies');
+    const day = 24 * 60 * 60_000;
+    const old = w.clock.now - 100 * day;
+    await w.db
+      .prepare(
+        `INSERT INTO pending_lots (list_id, lot_id, name, status, created_at, seen_at) VALUES
+           (?1, 'G1', 'Gone', 'dismissed', ?2, NULL), (?1, 'S1', 'Still', 'dismissed', ?2, ?2),
+           (?1, 'P1', 'Waiting', 'pending', ?2, NULL), (?1, 'R1', 'Recent', 'dismissed', ?2, ?3)`,
+      )
+      .bind(list.id, old, w.clock.now - 10 * day)
+      .run();
+    w.pointauc.set('token-forget-0000', [{ id: 'S9', name: 'Still', amount: 1 }]);
+    await w.call('PUT', '/api/pointauc/token', { channel: 'forget', body: { token: 'token-forget-0000' } });
+    await lotNames('forget', list.id); // the dialog sees "Still" in the auction
+    await w.scheduled();
+    expect((await w.all<{ name: string }>('SELECT name FROM pending_lots WHERE list_id = ? ORDER BY id', list.id)).map((lot) => lot.name)).toEqual([
+      'Still',
+      'Waiting',
+      'Recent',
+    ]);
+  });
+
+  it('a sync pass marks hidden lots still in the auction as seen, once a day', async () => {
+    const { list } = await w.seedList('seen-sync', 'movies');
+    await w.connectPointauc('seen-sync', list.id, 'token-seen-0000', [{ id: 'L1', name: 'Heat', amount: 1 }]);
+    const [{ id }] = await w.all<{ id: number }>('SELECT id FROM items WHERE list_id = ?', list.id);
+    await w.call('DELETE', `/api/items/${id}`, { channel: 'seen-sync' });
+    await w.db.prepare('UPDATE pending_lots SET seen_at = 0 WHERE list_id = ?').bind(list.id).run();
+    w.clock.now += 24 * 60 * 60_000; // the same lots: the first pass of a new day looks at them
+    await w.call('POST', '/api/pointauc/refresh', { channel: 'seen-sync' });
+    const [{ seen_at }] = await w.all<{ seen_at: number }>('SELECT seen_at FROM pending_lots WHERE list_id = ?', list.id);
+    expect(seen_at).toBe(w.clock.now);
+    await w.call('POST', '/api/pointauc/refresh', { channel: 'seen-sync' });
+    expect(await w.all('SELECT seen_at FROM pending_lots WHERE list_id = ?', list.id)).toEqual([{ seen_at }]);
+  });
+
+  it('the cron finds old hidden lots by an index', async () => {
+    const plan = await w.all<{ detail: string }>(
+      "EXPLAIN QUERY PLAN SELECT id FROM pending_lots WHERE status = 'dismissed' AND COALESCE(seen_at, created_at) < 0 LIMIT 50",
+    );
+    expect(plan.map((row) => row.detail).join()).toContain('USING INDEX pending_lots_gone');
+  });
+});

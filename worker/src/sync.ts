@@ -3,10 +3,14 @@
 import {
   AUTO_ADD_MIN_VOTES,
   CRON_CHANNELS,
+  HIDDEN_LOT_TTL_MS,
+  HIDDEN_LOTS_PER_RUN,
   MAX_ITEMS_PER_LIST,
   OUTSIDE_TIMEOUT_MS,
   SUBREQUEST_LIMIT,
+  SYNC_GIVE_UP_MS,
   SYNC_PACE_MS,
+  SYNC_RETRY_MAX_MS,
   type Env,
 } from './config';
 import { decryptText } from './crypto';
@@ -28,7 +32,7 @@ export const getEncryptionKey = (env: Env) => {
 };
 
 /** The stored Pointauc token in clear; one saved under another key cannot be read and has to be entered again. */
-const readPointaucToken = async (env: Env, stored: string) => {
+export const readPointaucToken = async (env: Env, stored: string) => {
   const key = getEncryptionKey(env);
   try {
     return await decryptText(stored, key);
@@ -59,6 +63,45 @@ export const fetchPointaucLots = async (token: string) => {
 export const loadPointaucLots = async (env: Env, storedToken: string | null | undefined) => {
   if (!storedToken) throw new HttpError(409, 'Pointauc is not connected');
   return fetchPointaucLots(await readPointaucToken(env, storedToken));
+};
+
+const MINUTE_MS = 60_000;
+const DAY_MS = 24 * 60 * MINUTE_MS;
+
+type HiddenLot = { id: number; lot_id: string; name: string; seen_at: number | null };
+
+/**
+ * Hidden lots (deleted from the list or hidden from "pending") among the auction's lots now — by lot id or by title,
+ * as ids change when the Pointauc tab is reloaded. Returns the test, and the write that marks them as still in the
+ * auction (a hidden lot is forgotten 90 days after it was last there) — at most once a day per lot, as passes run
+ * every few seconds.
+ */
+const matchHidden = (db: D1Database, hidden: HiddenLot[], lots: PointaucLot[], now: number) => {
+  const has = (ids: Set<string>, titles: Set<string>, id: string, name: string) => ids.has(id) || titles.has(normalizeTitle(name));
+  const hiddenIds = new Set(hidden.map((lot) => lot.lot_id));
+  const hiddenTitles = new Set(hidden.map((lot) => normalizeTitle(lot.name)));
+  const lotIds = new Set(lots.map((lot) => lot.id));
+  const lotTitles = new Set(lots.map((lot) => normalizeTitle(lot.name)));
+  const seen = hidden
+    .filter((lot) => has(lotIds, lotTitles, lot.lot_id, lot.name) && (lot.seen_at ?? 0) < now - DAY_MS)
+    .map((lot) => lot.id);
+  return {
+    isHidden: (lot: PointaucLot) => has(hiddenIds, hiddenTitles, lot.id, lot.name),
+    markSeen: seen.length
+      ? db.prepare('UPDATE pending_lots SET seen_at = ? WHERE id IN (SELECT value FROM json_each(?))').bind(now, JSON.stringify(seen))
+      : null,
+  };
+};
+
+/** The hidden lots of a list, for the import dialog: it never offers them again (typing the title in brings one back). */
+export const loadHiddenLots = async (db: D1Database, listId: number, lots: PointaucLot[]) => {
+  const hidden = await db
+    .prepare("SELECT id, lot_id, name, seen_at FROM pending_lots WHERE list_id = ? AND status = 'dismissed'")
+    .bind(listId)
+    .all<HiddenLot>();
+  const { isHidden, markSeen } = matchHidden(db, hidden.results, lots, Date.now());
+  await markSeen?.run();
+  return isHidden;
 };
 
 type ItemLots = Pick<ItemRow, 'id' | 'title' | 'points' | 'lot_id'>;
@@ -121,20 +164,42 @@ export const autoSyncChannel = async (env: Env, channelId: string, listId: numbe
   const list = await db.prepare('SELECT * FROM lists WHERE id = ? AND channel_id = ?').bind(listId, channelId).first<ListRow>();
   if (!list) return false;
   const now = Date.now();
+  // The cron's next turn for the channel is a minute after its latest pass, however it ran (cron or panel).
   const claim = await db
     .prepare(
-      `UPDATE channels SET pointauc_synced_at = ?1
+      `UPDATE channels SET pointauc_synced_at = ?1, pointauc_due_at = ?1
        WHERE channel_id = ?2 AND (?3 OR pointauc_synced_at IS NULL OR pointauc_synced_at <= ?1 - ${SYNC_PACE_MS})
-       RETURNING pointauc_lots_hash`,
+       RETURNING pointauc_lots_hash, pointauc_failing_since`,
     )
     .bind(now, channelId, force ? 1 : 0)
-    .first<{ pointauc_lots_hash: string | null }>();
+    .first<{ pointauc_lots_hash: string | null; pointauc_failing_since: number | null }>();
   if (!claim) return false; // another pass ran moments ago
 
   budget.left -= 3; // Pointauc now, the publish at the end
-  const lots = await loadPointaucLots(env, storedToken);
-  const lotsHash = await fingerprint(JSON.stringify([list.id, lots]));
+  let lots: PointaucLot[];
+  try {
+    lots = await loadPointaucLots(env, storedToken);
+  } catch (error) {
+    // No answer (the Pointauc tab is closed, or the token has to be entered again): the cron asks again 1, 2, 4…
+    // minutes later, at most hourly, and stops after 30 days — until the streamer opens a window (GET /api/channel).
+    const since = claim.pointauc_failing_since ?? now;
+    const retryAt = now - since > SYNC_GIVE_UP_MS ? null : now + Math.min(Math.max(now - since, MINUTE_MS), SYNC_RETRY_MAX_MS);
+    await db
+      .prepare('UPDATE channels SET pointauc_failing_since = ?, pointauc_due_at = ? WHERE channel_id = ?')
+      .bind(since, retryAt, channelId)
+      .run();
+    budget.left += 2;
+    throw error;
+  }
+  const answered =
+    claim.pointauc_failing_since === null
+      ? []
+      : [db.prepare('UPDATE channels SET pointauc_failing_since = NULL WHERE channel_id = ?').bind(channelId)];
+  // The day is part of the fingerprint: once a day a pass looks at the list even if the lots stay the same, so the
+  // hidden lots still in the auction are marked as seen.
+  const lotsHash = await fingerprint(JSON.stringify([list.id, Math.floor(now / DAY_MS), lots]));
   if (!force && lotsHash === claim.pointauc_lots_hash) {
+    if (answered.length) await db.batch(answered);
     budget.left += 2;
     return false;
   }
@@ -142,9 +207,9 @@ export const autoSyncChannel = async (env: Env, channelId: string, listId: numbe
   const [items, pending] = await Promise.all([
     loadItemLots(db, list.id),
     db
-      .prepare('SELECT lot_id, name, points, status FROM pending_lots WHERE list_id = ?')
+      .prepare('SELECT id, lot_id, name, points, status, seen_at FROM pending_lots WHERE list_id = ?')
       .bind(list.id)
-      .all<{ lot_id: string; name: string; points: number | null; status: 'pending' | 'dismissed' }>(),
+      .all<HiddenLot & { points: number | null; status: 'pending' | 'dismissed' }>(),
   ]);
   // New: lots neither in the list (by lot or title) nor seen before in "pending" (by lot or title).
   const seenIds = new Set(pending.results.map((lot) => lot.lot_id));
@@ -174,10 +239,11 @@ export const autoSyncChannel = async (env: Env, channelId: string, listId: numbe
     ...toPending.map((lot) => park.bind(list.id, lot.id, lot.name, lot.amount, now)),
     ...toRebid.map((lot) => rebid.bind(lot.amount, list.id, lot.id)),
   ];
+  const { markSeen } = matchHidden(db, pending.results.filter((lot) => lot.status === 'dismissed'), lots, now);
   // The fingerprint is kept only when every lot was handled: lots left for later must not look done.
   const isComplete = handled.length === fresh.length;
   const remember = db.prepare('UPDATE channels SET pointauc_lots_hash = ? WHERE channel_id = ?').bind(isComplete ? lotsHash : null, channelId);
-  await db.batch([...statements, remember]);
+  await db.batch([...statements, ...(markSeen ? [markSeen] : []), ...answered, remember]);
 
   const isVisible = plan.toUpdate.length + toQueue.length > 0; // pending lots are not in the snapshot
   if (isVisible) await publishSnapshot(env, channelId);
@@ -186,13 +252,15 @@ export const autoSyncChannel = async (env: Env, channelId: string, listId: numbe
 };
 
 /**
- * Cron entry: snapshots Twitch did not take go out again, then a few channels that switched the sync on (picked at
- * random, so every channel gets its turn). A failing channel (Pointauc tab closed) is just skipped.
+ * Cron entry: snapshots Twitch did not take go out again, then the channels whose turn has come — the longest
+ * waiting first (a channel's turn is a minute after its latest pass, later while Pointauc does not answer, none after
+ * 30 days of silence). A failing channel is just skipped. Last, a few hidden lots gone from the auction are forgotten.
  */
-// ponytail: CRON_CHANNELS random channels a minute; with dozens of syncing channels each waits minutes for its
-// turn — then add a sync queue (or move to Workers Paid).
+// ponytail: CRON_CHANNELS channels a minute, so with a few hundred syncing channels whose panels are closed each
+// waits minutes for its turn — then a sync queue (or Workers Paid, with more subrequests per run).
 export const runAutoSync = async (env: Env) => {
   const budget: Budget = { left: SUBREQUEST_LIMIT };
+  const now = Date.now();
   const stale = await env.DB.prepare(`SELECT channel_id FROM channels WHERE snapshot_stale = 1 LIMIT ${CRON_CHANNELS}`).all<{ channel_id: string }>();
   for (const { channel_id } of stale.results) {
     budget.left -= 2;
@@ -201,8 +269,11 @@ export const runAutoSync = async (env: Env) => {
 
   const channels = await env.DB.prepare(
     `SELECT channel_id, pointauc_list_id, pointauc_token FROM channels
-     WHERE pointauc_list_id IS NOT NULL AND pointauc_token IS NOT NULL ORDER BY random() LIMIT ${CRON_CHANNELS}`,
-  ).all<{ channel_id: string; pointauc_list_id: number; pointauc_token: string }>();
+     WHERE pointauc_list_id IS NOT NULL AND pointauc_token IS NOT NULL AND pointauc_due_at <= ?
+     ORDER BY pointauc_due_at LIMIT ${CRON_CHANNELS}`,
+  )
+    .bind(now)
+    .all<{ channel_id: string; pointauc_list_id: number; pointauc_token: string }>();
   for (const channel of channels.results) {
     try {
       await autoSyncChannel(env, channel.channel_id, channel.pointauc_list_id, channel.pointauc_token, budget);
@@ -213,4 +284,11 @@ export const runAutoSync = async (env: Env) => {
       }
     }
   }
+
+  await env.DB.prepare(
+    `DELETE FROM pending_lots WHERE id IN (
+       SELECT id FROM pending_lots WHERE status = 'dismissed' AND COALESCE(seen_at, created_at) < ? LIMIT ${HIDDEN_LOTS_PER_RUN})`,
+  )
+    .bind(now - HIDDEN_LOT_TTL_MS)
+    .run();
 };

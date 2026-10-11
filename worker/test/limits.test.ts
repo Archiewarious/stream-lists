@@ -26,7 +26,7 @@ const syncedChannel = async (channel: string, lots = yearLots(channel, 1)) => {
   const { list } = await w.seedList(channel, 'movies');
   w.pointauc.set(`token-${channel}-0000`, lots);
   await w.call('PUT', '/api/pointauc/token', { channel, body: { token: `token-${channel}-0000` } });
-  await w.db.prepare('UPDATE channels SET pointauc_list_id = ? WHERE channel_id = ?').bind(list.id, channel).run();
+  await w.db.prepare('UPDATE channels SET pointauc_list_id = ?, pointauc_due_at = 0 WHERE channel_id = ?').bind(list.id, channel).run();
   return list;
 };
 
@@ -138,3 +138,60 @@ describe('snapshot publishing', () => {
     expect(published.at(-1).lists[0].q.map((item: any) => item.t).sort()).toEqual(ids.map((_, i) => `Edited ${i}`));
   });
 });
+
+describe('automatic sync without an answer from Pointauc', () => {
+  const MINUTE = 60_000;
+  /** Minutes (from now) at which the cron asked Pointauc for the channel's lots. */
+  const cronCalls = async (token: string, minutes: number) => {
+    w.clock.auto = false;
+    const start = w.clock.now;
+    const calls: number[] = [];
+    for (let minute = 0; minute <= minutes; minute++) {
+      w.clock.now = start + minute * MINUTE;
+      if ((await w.scheduled()).some((call) => call.kind === 'pointauc' && call.auth === token)) calls.push(minute);
+    }
+    return calls;
+  };
+  const closedTab = async (channel: string) => {
+    await w.db.prepare('UPDATE channels SET pointauc_list_id = NULL').run(); // only this channel syncs
+    await syncedChannel(channel, []);
+    w.pointauc.delete(`token-${channel}-0000`); // Pointauc answers 500, as with its tab closed
+  };
+
+  it('asks 1, 2, 4... minutes apart, at most hourly', async () => {
+    await closedTab('backoff');
+    expect(await cronCalls('token-backoff-0000', 190)).toEqual([0, 1, 2, 4, 8, 16, 32, 64, 124, 184]);
+  });
+
+  it('goes back to every minute once Pointauc answers', async () => {
+    await closedTab('answers');
+    await cronCalls('token-answers-0000', 5);
+    w.pointauc.set('token-answers-0000', []);
+    w.clock.now += 3 * MINUTE;
+    expect(await cronCalls('token-answers-0000', 3)).toEqual([0, 1, 2, 3]);
+  });
+
+  it('stops after 30 days of silence and starts again when the streamer opens a window', async () => {
+    await closedTab('silent');
+    w.clock.auto = false;
+    await w.db
+      .prepare("UPDATE channels SET pointauc_failing_since = ?, pointauc_due_at = ? WHERE channel_id = 'silent'")
+      .bind(w.clock.now - 31 * 24 * 60 * MINUTE, w.clock.now)
+      .run();
+    expect(await cronCalls('token-silent-0000', 0)).toEqual([0]);
+    w.clock.now += MINUTE;
+    expect(await cronCalls('token-silent-0000', 120)).toEqual([]);
+    await w.call('GET', '/api/channel', { channel: 'silent' });
+    w.clock.now += MINUTE;
+    expect(await cronCalls('token-silent-0000', 0)).toEqual([0]);
+  });
+
+  it('the cron finds due channels by an index', async () => {
+    const plan = await w.all<{ detail: string }>(
+      `EXPLAIN QUERY PLAN SELECT channel_id FROM channels WHERE pointauc_list_id IS NOT NULL AND pointauc_token IS NOT NULL
+       AND pointauc_due_at <= 0 ORDER BY pointauc_due_at LIMIT 4`,
+    );
+    expect(plan.map((row) => row.detail).join()).toContain('USING INDEX channels_sync_due');
+  });
+});
+
