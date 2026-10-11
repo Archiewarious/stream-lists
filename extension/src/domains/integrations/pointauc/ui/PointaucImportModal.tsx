@@ -1,4 +1,4 @@
-import { Anchor, Button, Checkbox, Group, Loader, Modal, PasswordInput, ScrollArea, Text } from '@mantine/core';
+import { Anchor, Button, Checkbox, Group, Loader, Modal, PasswordInput, ScrollArea, Switch, Text } from '@mantine/core';
 import { IconCheck, IconPlus, IconRefresh } from '@tabler/icons-react';
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -16,6 +16,10 @@ interface PointaucImportModalProps {
   isConnected: boolean;
   onConnect: (token: string) => Promise<void>;
   onDisconnect: () => void;
+  /** The list the automatic sync feeds (null — sync is off). */
+  syncListId: number | null;
+  /** Resolves false when Pointauc could not be reached for the first pass. */
+  onToggleSync: (isOn: boolean) => Promise<boolean>;
   /** Resolves false when saving failed — the dialog and the selection stay. */
   onImport: (lotIds: string[], status: ItemStatus) => Promise<boolean>;
 }
@@ -68,12 +72,21 @@ const ConnectForm = ({ onConnect }: Pick<PointaucImportModalProps, 'onConnect'>)
 
 /** Lots of the current Pointauc auction → this list. New lots are preselected; known ones are shown with their status. */
 const PointaucImportModal = (props: PointaucImportModalProps) => {
-  const { opened, onClose, listId, kind, isConnected, onConnect, onDisconnect, onImport } = props;
+  const { opened, onClose, listId, kind, isConnected, onConnect, onDisconnect, onImport, syncListId, onToggleSync } = props;
   const { t, i18n } = useTranslation();
   const [lots, setLots] = useState<ImportLot[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [isImporting, setIsImporting] = useState(false);
+  const [isTogglingSync, setIsTogglingSync] = useState(false);
+  const [syncWarning, setSyncWarning] = useState(false);
+  const isSyncOn = syncListId === listId;
+
+  const toggleSync = async (isOn: boolean) => {
+    setIsTogglingSync(true);
+    setSyncWarning(!(await onToggleSync(isOn)) && isOn);
+    setIsTogglingSync(false);
+  };
 
   const loadLots = useCallback(async () => {
     setLots(null);
@@ -157,7 +170,17 @@ const PointaucImportModal = (props: PointaucImportModalProps) => {
         </Text>
       ) : (
         <>
-          <ScrollArea.Autosize mah={380}>
+          <div className="mb-2 rounded-[14px] bg-white/5 px-3 py-2">
+            <Switch
+              checked={isSyncOn}
+              disabled={isTogglingSync}
+              onChange={(event) => toggleSync(event.currentTarget.checked)}
+              label={t('pointauc.autoSync')}
+              description={t('pointauc.autoSyncHint')}
+            />
+            {syncWarning && <p className="mt-1 text-xs text-fg-2">{t('pointauc.syncNoAnswer')}</p>}
+          </div>
+          <ScrollArea.Autosize mah={340}>
             {lots.map((lot) => (
               <label
                 key={lot.id}

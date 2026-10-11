@@ -24,6 +24,9 @@ const ITEM_STATUSES = ['queue', 'watched'];
 const TMDB_TYPES = ['movie', 'tv'];
 // A Worker request may make 50 subrequests; a few go to Pointauc and Twitch, the rest to TMDB lookups.
 const MAX_TMDB_LOOKUPS = 25;
+// The automatic sync queues a lot by itself only if TMDB's entry has this many votes — viewers write the lots,
+// and TMDB has odd entries named like anything.
+const AUTO_ADD_MIN_VOTES = 20;
 
 // The token travels in a header, not a cookie, so any origin is fine.
 const CORS_HEADERS = {
@@ -112,16 +115,21 @@ const loadChannel = async (db: D1Database, channelId: string): Promise<ChannelLi
 
 const loadSettings = (db: D1Database, channelId: string) =>
   db
-    .prepare('SELECT theme, pointauc_token FROM channels WHERE channel_id = ?')
+    .prepare('SELECT theme, pointauc_token, pointauc_list_id FROM channels WHERE channel_id = ?')
     .bind(channelId)
-    .first<{ theme: string | null; pointauc_token: string | null }>();
+    .first<{ theme: string | null; pointauc_token: string | null; pointauc_list_id: number | null }>();
 
 const loadTheme = async (db: D1Database, channelId: string): Promise<ChannelTheme | null> => {
   const stored = (await loadSettings(db, channelId))?.theme;
   return stored ? parseTheme(JSON.parse(stored)) : null;
 };
 
-const saveSetting = (db: D1Database, channelId: string, column: 'theme' | 'pointauc_token', value: string | null) =>
+const saveSetting = (
+  db: D1Database,
+  channelId: string,
+  column: 'theme' | 'pointauc_token' | 'pointauc_list_id',
+  value: string | number | null,
+) =>
   db
     .prepare(
       `INSERT INTO channels (channel_id, ${column}) VALUES (?, ?) ON CONFLICT (channel_id) DO UPDATE SET ${column} = excluded.${column}`,
@@ -187,7 +195,7 @@ const searchTmdb = async (query: string, language: string, apiKey: string) => {
 type TmdbFields = Pick<ItemRow, 'tmdb_id' | 'year' | 'poster_path' | 'tmdb_type'>;
 
 /** Poster, year and TMDB id for the titles TMDB knows for sure; the others are simply absent from the map. */
-const matchTitles = async (env: Env, titles: string[]): Promise<Map<string, TmdbFields>> => {
+const matchTitles = async (env: Env, titles: string[], minVotes = 0): Promise<Map<string, TmdbFields>> => {
   const found = new Map<string, TmdbFields>();
   const apiKey = env.TMDB_API_KEY;
   if (!apiKey) return found;
@@ -199,7 +207,7 @@ const matchTitles = async (env: Env, titles: string[]): Promise<Map<string, Tmdb
           match = pickMatch(title, await searchTmdb(query.slice(0, 100), 'ru-RU', apiKey));
           if (match) break;
         }
-        if (match) {
+        if (match && match.votes >= minVotes) {
           found.set(title, { tmdb_id: match.tmdb_id, year: match.year, poster_path: match.poster_path, tmdb_type: match.type });
         }
       } catch (error) {
@@ -298,6 +306,89 @@ const publishSnapshot = async (env: Env, channelId: string) => {
   }
 };
 
+// --- automatic Pointauc sync ---
+
+type PendingLot = { id: number; list_id: number; name: string; points: number | null };
+
+/**
+ * One sync pass for a channel: bids of known titles are refreshed; a new lot goes straight into the queue when TMDB
+ * knows the title for sure (a movie list), otherwise it waits in "pending" for the streamer. A lot seen once is never
+ * looked at again, so deleting or hiding it is final.
+ */
+const autoSyncChannel = async (env: Env, channelId: string, listId: number, storedToken: string) => {
+  const db = env.DB;
+  const list = await db.prepare('SELECT * FROM lists WHERE id = ? AND channel_id = ?').bind(listId, channelId).first<ListRow>();
+  if (!list) return;
+  const lots = await fetchPointaucLots(await decryptText(storedToken, getEncryptionKey(env)));
+
+  const [items, pending] = await Promise.all([
+    db
+      .prepare('SELECT id, title, points, lot_id FROM items WHERE list_id = ?')
+      .bind(list.id)
+      .all<Pick<ItemRow, 'id' | 'title' | 'points' | 'lot_id'>>(),
+    db.prepare('SELECT lot_id, name FROM pending_lots WHERE list_id = ?').bind(list.id).all<{ lot_id: string; name: string }>(),
+  ]);
+  const plan = planLotSync(lots, items.results, null);
+
+  const knownTitles = new Set([...items.results.map((item) => item.title), ...pending.results.map((lot) => lot.name)].map(normalizeTitle));
+  const knownLotIds = new Set([...items.results.map((item) => item.lot_id), ...pending.results.map((lot) => lot.lot_id)]);
+  const fresh: PointaucLot[] = [];
+  for (const lot of lots) {
+    const key = normalizeTitle(lot.name);
+    if (knownTitles.has(key) || knownLotIds.has(lot.id)) continue;
+    knownTitles.add(key);
+    fresh.push(lot);
+  }
+
+  // At most a few lookups per pass (the Worker's subrequest budget); the rest are picked up a minute later.
+  const batch = fresh.slice(0, MAX_TMDB_LOOKUPS);
+  const matched = list.kind === 'movies'
+      ? await matchTitles(env, batch.map((lot) => lot.name), AUTO_ADD_MIN_VOTES)
+      : new Map<string, TmdbFields>();
+  const toQueue = batch.filter((lot) => matched.has(lot.name));
+  const toPending = batch.filter((lot) => !matched.has(lot.name));
+  if (items.results.length + toQueue.length > MAX_ITEMS_PER_LIST) return;
+
+  const now = Date.now();
+  const basePosition = (await db.prepare(`SELECT ${NEXT_QUEUE_POSITION} AS next`).bind(list.id).first<number>('next')) ?? 1;
+  const update = db.prepare('UPDATE items SET points = ?, lot_id = ? WHERE id = ?');
+  const insert = db.prepare(
+    `INSERT INTO items (list_id, title, year, tmdb_id, poster_path, tmdb_type, status, position, added_at, source, points, lot_id)
+     VALUES (?, ?, ?, ?, ?, ?, 'queue', ?, ?, 'pointauc', ?, ?)`,
+  );
+  const park = db.prepare('INSERT OR IGNORE INTO pending_lots (list_id, lot_id, name, points, created_at) VALUES (?, ?, ?, ?, ?)');
+
+  const statements = [
+    ...plan.toUpdate.map((change) => update.bind(change.points, change.lot_id, change.id)),
+    ...toQueue.map((lot, index) => {
+      const movie = matched.get(lot.name)!;
+      return insert.bind(list.id, lot.name, movie.year, movie.tmdb_id, movie.poster_path, movie.tmdb_type, basePosition + index, now, lot.amount, lot.id);
+    }),
+    ...toPending.map((lot) => park.bind(list.id, lot.id, lot.name, lot.amount, now)),
+  ];
+  if (!statements.length) return;
+
+  await db.batch(statements);
+  await publishSnapshot(env, channelId);
+};
+
+/** Cron entry: every channel that switched the sync on. A failing channel (Pointauc tab closed) is just skipped. */
+// ponytail: channels are handled one after another within one invocation's subrequest budget (50); with many
+// channels, spread them over several cron ticks or use a queue.
+const runAutoSync = async (env: Env) => {
+  const channels = await env.DB
+    .prepare('SELECT channel_id, pointauc_list_id, pointauc_token FROM channels WHERE pointauc_list_id IS NOT NULL AND pointauc_token IS NOT NULL LIMIT 10')
+    .all<{ channel_id: string; pointauc_list_id: number; pointauc_token: string }>();
+
+  for (const channel of channels.results) {
+    try {
+      await autoSyncChannel(env, channel.channel_id, channel.pointauc_list_id, channel.pointauc_token);
+    } catch (error) {
+      console.error('Auto sync failed', channel.channel_id, error);
+    }
+  }
+};
+
 // --- routes ---
 
 const handleApi = async (request: Request, env: Env, channelId: string, route: string, id: number) => {
@@ -311,6 +402,17 @@ const handleApi = async (request: Request, env: Env, channelId: string, route: s
         lists: await loadChannel(db, channelId),
         theme: settings?.theme ? parseTheme(JSON.parse(settings.theme)) : null,
         pointauc: !!settings?.pointauc_token,
+        pointauc_list_id: settings?.pointauc_list_id ?? null,
+        // Lots TMDB did not know — the streamer decides (the viewer snapshot never contains them).
+        pending: (
+          await db
+            .prepare(
+              `SELECT p.id, p.list_id, p.name, p.points FROM pending_lots p JOIN lists ON lists.id = p.list_id
+               WHERE lists.channel_id = ? AND p.status = 'pending' ORDER BY p.id`,
+            )
+            .bind(channelId)
+            .all<PendingLot>()
+        ).results,
       };
     }
 
@@ -332,6 +434,7 @@ const handleApi = async (request: Request, env: Env, channelId: string, route: s
 
     case 'DELETE /api/pointauc/token':
       await saveSetting(db, channelId, 'pointauc_token', null);
+      await saveSetting(db, channelId, 'pointauc_list_id', null);
       return { ok: true };
 
     case 'GET /api/pointauc/lots': {
@@ -360,6 +463,71 @@ const handleApi = async (request: Request, env: Env, channelId: string, route: s
       const lots = await fetchPointaucLots(await decryptText(stored, getEncryptionKey(env)));
       const { added } = await syncLots(env, list, lots, new Set<string>(lotIds), status);
       return { added, skipped: lotIds.length - added.length };
+    }
+
+    case 'PUT /api/pointauc/sync': {
+      // Switches the automatic sync on for one list (or off with list_id: null); the first pass runs right away.
+      const { list_id: listId } = await readBody(request);
+      if (listId === null) {
+        await saveSetting(db, channelId, 'pointauc_list_id', null);
+        return { ok: true, synced: true };
+      }
+      const stored = (await loadSettings(db, channelId))?.pointauc_token;
+      if (!stored) throw new HttpError(409, 'Pointauc is not connected');
+      const list = await getOwnedList(db, channelId, Number(listId));
+      await saveSetting(db, channelId, 'pointauc_list_id', list.id);
+      try {
+        await autoSyncChannel(env, channelId, list.id, stored);
+        return { ok: true, synced: true };
+      } catch (error) {
+        console.error('First sync failed', error); // stays on: the next minute may find the Pointauc tab open
+        return { ok: true, synced: false };
+      }
+    }
+
+    case 'POST /api/pending/:id/accept': {
+      // The streamer looked at a lot TMDB did not know: put it into the queue (title may be corrected first).
+      const row = await db
+        .prepare(
+          `SELECT p.* FROM pending_lots p JOIN lists ON lists.id = p.list_id
+           WHERE p.id = ? AND lists.channel_id = ? AND p.status = 'pending'`,
+        )
+        .bind(id, channelId)
+        .first<{ id: number; list_id: number; lot_id: string; name: string; points: number | null }>();
+      if (!row) throw new HttpError(404, 'Lot not found');
+      const body = await readBody(request).catch(() => ({}) as Record<string, unknown>);
+      const list = await getOwnedList(db, channelId, row.list_id);
+      const title = 'title' in body ? readTitle(body.title, MAX_ITEM_TITLE_LENGTH) : row.name;
+
+      const fields = readMovieFields(body);
+      if (list.kind === 'movies' && !('tmdb_id' in body)) Object.assign(fields, (await matchTitles(env, [title])).get(title));
+      const { year = null, tmdb_id = null, poster_path = null, tmdb_type = null } = fields;
+
+      const done = db.prepare("UPDATE pending_lots SET status = 'dismissed' WHERE id = ?").bind(row.id);
+      const existing = await db.prepare('SELECT id, title FROM items WHERE list_id = ?').bind(list.id).all<{ id: number; title: string }>();
+      if (existing.results.some((item) => normalizeTitle(item.title) === normalizeTitle(title))) {
+        await done.run(); // the list has it already
+        return { ok: true, added: false };
+      }
+      const insert = db
+        .prepare(
+          `INSERT INTO items (list_id, title, year, tmdb_id, poster_path, tmdb_type, status, position, added_at, source, points, lot_id)
+           VALUES (?, ?, ?, ?, ?, ?, 'queue', ${NEXT_QUEUE_POSITION}, ?, 'pointauc', ?, ?) RETURNING *`,
+        )
+        .bind(list.id, title, year, tmdb_id, poster_path, tmdb_type, list.id, now, row.points, row.lot_id);
+      const [inserted] = await db.batch<ItemRow>([insert, done]);
+      return { ok: true, added: true, item: inserted.results[0] };
+    }
+
+    case 'DELETE /api/pending/:id': {
+      await db
+        .prepare(
+          `UPDATE pending_lots SET status = 'dismissed'
+           WHERE id = ? AND list_id IN (SELECT id FROM lists WHERE channel_id = ?)`,
+        )
+        .bind(id, channelId)
+        .run();
+      return { ok: true };
     }
 
     case 'GET /api/tmdb/search': {
@@ -543,8 +711,18 @@ const handleApi = async (request: Request, env: Env, channelId: string, route: s
     }
 
     case 'DELETE /api/items/:id':
-      await getOwnedItem(db, channelId, id);
-      await db.prepare('DELETE FROM items WHERE id = ?').bind(id).run();
+      const item = await getOwnedItem(db, channelId, id);
+      const statements = [db.prepare('DELETE FROM items WHERE id = ?').bind(id)];
+      if (item.lot_id) {
+        statements.unshift(
+          db
+            .prepare(
+              "INSERT OR IGNORE INTO pending_lots (list_id, lot_id, name, points, status, created_at) VALUES (?, ?, ?, ?, 'dismissed', ?)",
+            )
+            .bind(item.list_id, item.lot_id, item.title, item.points, now),
+        );
+      }
+      await db.batch(statements);
       return { ok: true };
 
     default:
@@ -553,6 +731,10 @@ const handleApi = async (request: Request, env: Env, channelId: string, route: s
 };
 
 export default {
+  async scheduled(_event, env, ctx) {
+    ctx.waitUntil(runAutoSync(env));
+  },
+
   async fetch(request, env, ctx): Promise<Response> {
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS_HEADERS });
 

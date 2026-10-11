@@ -80,9 +80,9 @@ describe('toTmdbResults', () => {
       ],
     });
     expect(results).toEqual([
-      { tmdb_id: 693134, title: 'Дюна: Часть вторая', year: 2024, poster_path: '/abc.jpg', type: 'movie', original_title: null },
-      { tmdb_id: 94605, title: 'Аркейн', year: 2021, poster_path: null, type: 'tv', original_title: null },
-      { tmdb_id: 2, title: 'Без даты', year: null, poster_path: null, type: 'movie', original_title: null },
+      { tmdb_id: 693134, title: 'Дюна: Часть вторая', year: 2024, poster_path: '/abc.jpg', type: 'movie', original_title: null, votes: 0 },
+      { tmdb_id: 94605, title: 'Аркейн', year: 2021, poster_path: null, type: 'tv', original_title: null, votes: 0 },
+      { tmdb_id: 2, title: 'Без даты', year: null, poster_path: null, type: 'movie', original_title: null, votes: 0 },
     ]);
   });
 });
@@ -141,6 +141,7 @@ describe('pickMatch', () => {
     poster_path: '/p.jpg',
     type: 'movie',
     original_title: original,
+    votes: 100,
   });
 
   it('takes only a certain match: same name ignoring case, punctuation and ё', () => {

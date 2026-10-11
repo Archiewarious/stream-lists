@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 
 import type { ItemRow } from '@worker/snapshot';
 import AppearanceView from '@domains/appearance/ui/AppearanceView';
+import PendingLotsModal from '@domains/integrations/pointauc/ui/PendingLotsModal';
 import PointaucImportModal from '@domains/integrations/pointauc/ui/PointaucImportModal';
 import { useAddItem } from '@domains/lists/model/useAddItem';
 import { useChannel, type ItemStatus, type ListKind } from '@domains/lists/model/useChannel';
@@ -27,6 +28,7 @@ const ConfigPage = () => {
   const [isPointaucOpened, setIsPointaucOpened] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [isPendingOpened, setIsPendingOpened] = useState(false);
   const addItem = useAddItem(channel, channel.lists?.find((candidate) => candidate.id === activeListId) ?? channel.lists?.[0]);
 
   const selectList = (listId: number) => {
@@ -69,6 +71,7 @@ const ConfigPage = () => {
   }
 
   const list = channel.lists.find((candidate) => candidate.id === activeListId) ?? channel.lists[0];
+  const pendingLots = channel.pendingLots.filter((lot) => lot.list_id === list.id);
   const queue = list.items.filter((item) => item.status === 'queue');
   const watched = list.items.filter((item) => item.status === 'watched');
 
@@ -124,6 +127,11 @@ const ConfigPage = () => {
               <Title order={1} size={48} className="min-w-0 flex-1 truncate !leading-[1.25]">
                 {list.title}
               </Title>
+              {pendingLots.length > 0 && (
+                <button type="button" className="chip chip-new" onClick={() => setIsPendingOpened(true)}>
+                  {t('pending.banner', { count: pendingLots.length })}
+                </button>
+              )}
               <Button variant="default" leftSection={<IconChartPie size={16} />} onClick={() => setIsPointaucOpened(true)}>
                 {t('pointauc.open')}
               </Button>
@@ -156,6 +164,15 @@ const ConfigPage = () => {
         )}
       </main>
 
+      <PendingLotsModal
+        opened={isPendingOpened && pendingLots.length > 0}
+        onClose={() => setIsPendingOpened(false)}
+        lots={pendingLots}
+        withSuggestions={list.kind === 'movies'}
+        onAccept={channel.acceptPending}
+        onDismiss={channel.dismissPending}
+      />
+
       <ItemEditModal
         item={list.items.find((item) => item.id === editingId) ?? null}
         kind={list.kind}
@@ -171,6 +188,8 @@ const ConfigPage = () => {
         isConnected={channel.isPointaucConnected}
         onConnect={channel.connectPointauc}
         onDisconnect={channel.disconnectPointauc}
+        syncListId={channel.pointaucListId}
+        onToggleSync={(isOn) => channel.setPointaucSync(isOn ? list.id : null)}
         onImport={importLots}
       />
 

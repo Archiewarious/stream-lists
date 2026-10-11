@@ -8,6 +8,7 @@ import { matchesTitle } from '@domains/lists/lib/items';
 import { useAddItem } from '@domains/lists/model/useAddItem';
 import { useChannel, type ItemStatus } from '@domains/lists/model/useChannel';
 import AddItemBar from '@domains/lists/ui/AddItemBar';
+import PendingLotsModal from '@domains/integrations/pointauc/ui/PendingLotsModal';
 import ItemEditModal from '@domains/lists/ui/ItemEditModal';
 import { QueueList, WatchedList } from '@domains/lists/ui/ItemLists';
 import ListSwitcher from '@domains/lists/ui/ListSwitcher';
@@ -27,6 +28,7 @@ const AuthorPanel = ({ onViewAsViewer }: AuthorPanelProps) => {
   const [tab, setTab] = useState<Tab>('queue');
   const [query, setQuery] = useState('');
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [isPendingOpened, setIsPendingOpened] = useState(false);
 
   const list = channel.lists?.find((candidate) => candidate.id === activeListId) ?? channel.lists?.[0];
   const addItem = useAddItem(channel, list);
@@ -45,6 +47,7 @@ const AuthorPanel = ({ onViewAsViewer }: AuthorPanelProps) => {
   const watched = found.filter((item) => item.status === 'watched');
   const total = (status: ItemStatus) => list.items.filter((item) => item.status === status).length;
   const isSearching = !!query.trim();
+  const pendingLots = channel.pendingLots.filter((lot) => lot.list_id === list.id);
 
   const actions = {
     onWatched: (itemId: number) => channel.setStatus(itemId, 'watched'),
@@ -92,6 +95,16 @@ const AuthorPanel = ({ onViewAsViewer }: AuthorPanelProps) => {
         </Alert>
       )}
 
+      {pendingLots.length > 0 && (
+        <button
+          type="button"
+          className="chip chip-new self-start"
+          onClick={() => setIsPendingOpened(true)}
+        >
+          {t('pending.banner', { count: pendingLots.length })}
+        </button>
+      )}
+
       <SegmentedControl
         size="xs"
         fullWidth
@@ -122,6 +135,16 @@ const AuthorPanel = ({ onViewAsViewer }: AuthorPanelProps) => {
           />
         )}
       </ScrollArea>
+
+      <PendingLotsModal
+        opened={isPendingOpened && pendingLots.length > 0}
+        onClose={() => setIsPendingOpened(false)}
+        lots={pendingLots}
+        withSuggestions={list.kind === 'movies'}
+        isFullScreen
+        onAccept={channel.acceptPending}
+        onDismiss={channel.dismissPending}
+      />
 
       <ItemEditModal
         item={list.items.find((item) => item.id === editingId) ?? null}

@@ -7,6 +7,14 @@ import { callWorker } from '@shared/api/workerApi';
 import { twitchApi } from '@shared/twitch/twitchApi';
 
 export type ListKind = ListRow['kind'];
+
+/** A Pointauc lot the sync could not verify with TMDB — waits for the streamer's decision. */
+export interface PendingLot {
+  id: number;
+  list_id: number;
+  name: string;
+  points: number | null;
+}
 export type ItemStatus = ItemRow['status'];
 export type MovieFields = Partial<Pick<ItemRow, 'year' | 'tmdb_id' | 'poster_path' | 'tmdb_type'>>;
 export type EditableItemFields = MovieFields & Partial<Pick<ItemRow, 'title' | 'rating'>>;
@@ -27,6 +35,8 @@ export const useChannel = () => {
   const [lists, setLists] = useState<ChannelList[] | null>(null);
   const [theme, setTheme] = useState<ChannelTheme | null>(null);
   const [isPointaucConnected, setIsPointaucConnected] = useState(false);
+  const [pointaucListId, setPointaucListId] = useState<number | null>(null);
+  const [pendingLots, setPendingLots] = useState<PendingLot[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -36,16 +46,21 @@ export const useChannel = () => {
   const reload = useCallback(async () => {
     const seq = ++reloadSeq.current;
     try {
-      const channel = await callWorker<{ lists: ChannelList[]; theme: ChannelTheme | null; pointauc: boolean }>(
-        'GET',
-        '/api/channel',
-      );
+      const channel = await callWorker<{
+        lists: ChannelList[];
+        theme: ChannelTheme | null;
+        pointauc: boolean;
+        pointauc_list_id: number | null;
+        pending: PendingLot[];
+      }>('GET', '/api/channel');
       // A newer reload is coming, or an edit started meanwhile (its own reload follows): this answer is stale
       // and would roll back the newer optimistic state.
       if (seq !== reloadSeq.current || pending.current) return;
       setLists(channel.lists);
       setTheme(channel.theme);
       setIsPointaucConnected(channel.pointauc);
+      setPointaucListId(channel.pointauc_list_id);
+      setPendingLots(channel.pending);
       applyTheme(channel.theme); // the streamer sees their window in the same colors as viewers
       setLoadError(null);
       if (import.meta.env.DEV) twitchApi.mirrorSnapshot?.(buildSnapshot(channel.lists, channel.theme));
@@ -95,6 +110,8 @@ export const useChannel = () => {
     lists,
     theme,
     isPointaucConnected,
+    pointaucListId,
+    pendingLots,
     loadError,
     reload,
     isSaving,
@@ -155,6 +172,18 @@ export const useChannel = () => {
       await callWorker('PUT', '/api/pointauc/token', { token });
       setIsPointaucConnected(true);
     },
+
+    /** Automatic sync of one list (null — off). Resolves false when the first pass could not reach Pointauc. */
+    setPointaucSync: async (listId: number | null) => {
+      const result = await run(() => callWorker<{ synced: boolean }>('PUT', '/api/pointauc/sync', { list_id: listId }));
+      return result?.synced ?? false;
+    },
+
+    /** Puts a pending lot into the queue; `fields` may carry a corrected title and the picked TMDB movie. */
+    acceptPending: (lotId: number, fields: EditableItemFields = {}) =>
+      run(() => callWorker('POST', `/api/pending/${lotId}/accept`, fields)),
+
+    dismissPending: (lotId: number) => run(() => callWorker('DELETE', `/api/pending/${lotId}`)),
 
     disconnectPointauc: () => run(() => callWorker('DELETE', '/api/pointauc/token')),
 

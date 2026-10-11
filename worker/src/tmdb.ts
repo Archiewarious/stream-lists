@@ -8,11 +8,14 @@ export interface TmdbResult {
   type: 'movie' | 'tv';
   /** Title in the original language — a lot may be named the English way. */
   original_title: string | null;
+  /** How many people rated it: junk entries with a movie-like name have none. */
+  votes: number;
 }
 
 interface TmdbRawResult {
   original_title?: string;
   original_name?: string;
+  vote_count?: number;
   id?: number;
   media_type?: string;
   title?: string;
@@ -36,6 +39,7 @@ export const toTmdbResults = (data: { results?: TmdbRawResult[] }): TmdbResult[]
       poster_path: raw.poster_path && POSTER_PATH.test(raw.poster_path) ? raw.poster_path : null,
       type: raw.media_type as TmdbResult['type'],
       original_title: (raw.original_title ?? raw.original_name ?? '').trim() || null,
+      votes: raw.vote_count ?? 0,
     }))
     .filter((result) => result.title)
     .slice(0, MAX_RESULTS);

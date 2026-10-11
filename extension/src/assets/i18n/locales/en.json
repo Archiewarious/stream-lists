@@ -136,7 +136,10 @@
     "retry": "Refresh",
     "disconnect": "Disconnect Pointauc",
     "empty": "No lots in the auction yet",
-    "noRepeats": "Watched and queued titles are not added twice"
+    "noRepeats": "Watched and queued titles are not added twice",
+    "autoSync": "Add new lots automatically",
+    "autoSyncHint": "Once a minute. Titles found in TMDB go to the queue, the rest to \"To review\".",
+    "syncNoAnswer": "Pointauc did not answer right now. Open pointauc.com with the auction — the sync will try again."
   },
   "rating": {
     "set": "Rate",
@@ -150,5 +153,14 @@
     "save": "Save",
     "noPoster": "No poster. Fix the title and pick the right movie from the suggestions.",
     "hasPoster": "You can fix the title or pick another movie."
+  },
+  "pending": {
+    "banner": "To review: {{count}}",
+    "title": "To review",
+    "hint": "These titles are not in the movie database. Add them to the queue, fix the title or hide them.",
+    "add": "To queue",
+    "hide": "Hide",
+    "edit": "Fix",
+    "empty": "All checked"
   }
 }

@@ -5,6 +5,8 @@
   "compatibility_date": "2026-09-30",
   "account_id": "c2445478e316f0101a6ea612040c8fb5",
   "observability": { "enabled": true },
+  // Automatic Pointauc sync, once a minute (channels that switched it on).
+  "triggers": { "crons": ["* * * * *"] },
   "vars": {
     // Twitch extension Client ID and the Twitch user who owns the extension (used to sign Helix requests).
     "CLIENT_ID": "rlbp8y9c7l7hqp9p77r8awnggble5p",
