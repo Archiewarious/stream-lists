@@ -7,6 +7,7 @@ import type { ChannelList } from '@worker/snapshot';
 import type { ListKind } from '@domains/lists/model/useChannel';
 import KindIcon from '@domains/lists/ui/KindIcon';
 import ListForm from '@domains/lists/ui/ListForm';
+import TmdbAttribution from '@shared/ui/TmdbAttribution';
 
 interface ListsSidebarProps {
   lists: ChannelList[];
@@ -102,6 +103,8 @@ const ListsSidebar = (props: ListsSidebarProps) => {
           </>
         )}
       </div>
+
+      <TmdbAttribution className="px-2.5 pt-4" />
     </aside>
   );
 };

@@ -181,12 +181,14 @@
     "edit": "Fix",
     "empty": "All checked"
   },
+  "tmdb": {
+    "attribution": "Data and posters from TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB."
+  },
   "details": {
     "minutes": "{{count}} min",
     "streamerRating": "Streamer rating {{rating}}",
     "failed": "Couldn't load the description.",
     "noOverview": "No description.",
-    "attribution": "Data and posters from TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB.",
     "seasons_one": "{{count}} season",
     "seasons_other": "{{count}} seasons"
   },

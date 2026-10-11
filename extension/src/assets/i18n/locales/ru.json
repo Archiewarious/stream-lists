@@ -181,13 +181,15 @@
     "edit": "Поправить",
     "empty": "Всё проверено"
   },
+  "tmdb": {
+    "attribution": "Данные и постеры — TMDB. Продукт использует API TMDB, но не одобрен и не сертифицирован TMDB."
+  },
   "details": {
     "minutes": "{{count}} мин",
     "seasons": "{{count}} сез.",
     "streamerRating": "Оценка стримера {{rating}}",
     "failed": "Не удалось загрузить описание.",
-    "noOverview": "Описания нет.",
-    "attribution": "Данные и постеры — TMDB. Продукт использует API TMDB, но не одобрен и не сертифицирован TMDB."
+    "noOverview": "Описания нет."
   },
   "common": {
     "close": "Закрыть",

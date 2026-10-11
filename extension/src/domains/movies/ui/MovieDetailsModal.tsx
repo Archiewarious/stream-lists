@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import type { MovieDetails } from '@worker/tmdb';
 import { callWorker } from '@shared/api/workerApi';
 import Poster from '@shared/ui/Poster';
+import TmdbAttribution from '@shared/ui/TmdbAttribution';
 
 /** What the card needs to know about a title; everything else comes from TMDB. */
 export interface DetailsTarget {
@@ -93,7 +94,7 @@ const MovieDetailsModal = ({ target, onClose }: MovieDetailsModalProps) => {
             <p className="text-sm leading-relaxed text-fg">{details.overview ?? t('details.noOverview')}</p>
           )}
 
-          <p className="text-[11px] text-fg-3">{t('details.attribution')}</p>
+          <TmdbAttribution />
         </div>
       )}
     </Modal>
