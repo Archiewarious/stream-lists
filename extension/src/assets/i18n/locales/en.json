@@ -133,6 +133,8 @@
     "token": "Pointauc token",
     "tokenSafety": "The token is stored encrypted on our server and never shown to viewers",
     "connect": "Connect",
+    "connected": "Pointauc connected",
+    "changeToken": "Change token",
     "connectFailed": "Pointauc rejected the token. Check it and that the pointauc.com tab is open",
     "loadFailed": "Pointauc did not answer. Open pointauc.com with your auction and press Refresh",
     "retry": "Refresh",

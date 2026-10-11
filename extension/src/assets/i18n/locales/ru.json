@@ -133,6 +133,8 @@
     "token": "Токен Pointauc",
     "tokenSafety": "Токен хранится зашифрованным на нашем сервере и не показывается зрителям",
     "connect": "Подключить",
+    "connected": "Pointauc подключён",
+    "changeToken": "Сменить токен",
     "connectFailed": "Pointauc не принял токен. Проверьте его и что вкладка pointauc.com открыта",
     "loadFailed": "Pointauc не ответил. Откройте pointauc.com с аукционом в браузере и нажмите «Обновить»",
     "retry": "Обновить",

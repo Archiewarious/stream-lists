@@ -25,7 +25,7 @@ interface PointaucImportModalProps {
   isFullScreen?: boolean;
 }
 
-const ConnectForm = ({ onConnect }: Pick<PointaucImportModalProps, 'onConnect'>) => {
+const ConnectForm = ({ onConnect, withSteps = true }: Pick<PointaucImportModalProps, 'onConnect'> & { withSteps?: boolean }) => {
   const { t } = useTranslation();
   const [token, setToken] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -46,11 +46,13 @@ const ConnectForm = ({ onConnect }: Pick<PointaucImportModalProps, 'onConnect'>)
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-3 px-1 pb-2">
-      <ol className="list-decimal space-y-1 pl-5 text-sm text-fg-2">
-        <li>{t('pointauc.step1')}</li>
-        <li>{t('pointauc.step2')}</li>
-        <li>{t('pointauc.step3')}</li>
-      </ol>
+      {withSteps && (
+        <ol className="list-decimal space-y-1 pl-5 text-sm text-fg-2">
+          <li>{t('pointauc.step1')}</li>
+          <li>{t('pointauc.step2')}</li>
+          <li>{t('pointauc.step3')}</li>
+        </ol>
+      )}
       <PasswordInput
         label={t('pointauc.token')}
         value={token}
@@ -81,6 +83,7 @@ const PointaucImportModal = (props: PointaucImportModalProps) => {
   const [isImporting, setIsImporting] = useState(false);
   const [isTogglingSync, setIsTogglingSync] = useState(false);
   const [syncWarning, setSyncWarning] = useState(false);
+  const [isChangingToken, setIsChangingToken] = useState(false);
   const isSyncOn = syncListId === listId;
 
   const toggleSync = async (isOn: boolean) => {
@@ -104,6 +107,13 @@ const PointaucImportModal = (props: PointaucImportModalProps) => {
   useEffect(() => {
     if (opened && isConnected) loadLots();
   }, [opened, isConnected, loadLots]);
+
+  /** A new token on the same screen: the lots are read again with it. Throws like `onConnect` so the form shows the error. */
+  const changeToken = async (token: string) => {
+    await onConnect(token);
+    setIsChangingToken(false);
+    loadLots();
+  };
 
   const toggle = (lotId: string) =>
     setSelected((current) => {
@@ -148,6 +158,25 @@ const PointaucImportModal = (props: PointaucImportModalProps) => {
         </span>
       }
     >
+      {isConnected && (
+        <div className="mb-2 rounded-[14px] bg-white/5 px-3 py-2">
+          <div className="flex items-center justify-between gap-3">
+            <span className="flex items-center gap-1.5 text-sm font-bold">
+              <IconCheck size={14} />
+              {t('pointauc.connected')}
+            </span>
+            <Anchor component="button" type="button" size="xs" onClick={() => setIsChangingToken((isOpened) => !isOpened)}>
+              {t('pointauc.changeToken')}
+            </Anchor>
+          </div>
+          {isChangingToken && (
+            <div className="mt-2">
+              <ConnectForm onConnect={changeToken} withSteps={false} />
+            </div>
+          )}
+        </div>
+      )}
+
       {!isConnected ? (
         <ConnectForm onConnect={onConnect} />
       ) : loadError ? (
@@ -212,15 +241,18 @@ const PointaucImportModal = (props: PointaucImportModalProps) => {
           </ScrollArea.Autosize>
           <div className="mt-2 flex flex-wrap items-center gap-3 border-t border-white/10 pt-3.5">
             <span className={`min-w-0 flex-1 text-xs text-fg-2 ${isFullScreen ? 'basis-full' : ''}`}>{t('pointauc.noRepeats')}</span>
-            <Button
-              variant="default"
-              leftSection={<IconCheck size={16} />}
-              disabled={!selected.size}
-              loading={isImporting}
-              onClick={() => importSelected('watched')}
-            >
-              {t(`columns.${kind}.toWatched`)}
-            </Button>
+            {/* ponytail: "straight to watched" is only in the settings window; the panel's one-tap import goes to the queue. */}
+            {!isFullScreen && (
+              <Button
+                variant="default"
+                leftSection={<IconCheck size={16} />}
+                disabled={!selected.size}
+                loading={isImporting}
+                onClick={() => importSelected('watched')}
+              >
+                {t(`columns.${kind}.toWatched`)}
+              </Button>
+            )}
             <Button
               leftSection={<IconPlus size={16} />}
               disabled={!selected.size}
