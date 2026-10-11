@@ -5,7 +5,7 @@ import { buildSnapshot, getByteSize, SNAPSHOT_LIMIT_BYTES, type ChannelList, typ
 import { decryptText, encryptText } from './crypto';
 import { matchLots, planLotSync, toPointaucLots } from './pointauc';
 import { parseTheme } from './theme';
-import { pickMatch, searchQueries, toTmdbResults, type TmdbResult } from './tmdb';
+import { pickMatch, searchQueries, toMovieDetails, toTmdbResults, type TmdbResult } from './tmdb';
 
 const secret = btoa('test-extension-secret-0123456789');
 const exp = Math.floor(Date.now() / 1000) + 60;
@@ -187,5 +187,29 @@ describe('planLotSync', () => {
 
   it('adds nothing without chosen ids', () => {
     expect(planLotSync(lots, items, null).toAdd).toEqual([]);
+  });
+});
+
+describe('toMovieDetails', () => {
+  it('reads a movie and a show, hides a rating nobody gave', () => {
+    const movie = toMovieDetails(
+      {
+        title: 'Дюна',
+        tagline: ' ',
+        overview: 'Пол Атрейдес...',
+        genres: [{ name: 'фантастика' }, { name: 'приключения' }],
+        runtime: 155,
+        vote_average: 7.8123,
+        vote_count: 12000,
+        release_date: '2021-09-15',
+        poster_path: '/3hbXNclcHaj5KiF6kK41GBMjyFr.jpg',
+      },
+      'movie',
+      438631,
+    );
+    expect(movie).toMatchObject({ title: 'Дюна', year: 2021, tagline: null, genres: ['фантастика', 'приключения'], runtime: 155, seasons: null, rating: 7.8, tmdb_url: 'https://www.themoviedb.org/movie/438631' });
+
+    const show = toMovieDetails({ name: 'Аркейн', episode_run_time: [40], number_of_seasons: 2, vote_count: 0, first_air_date: '2021-11-06' }, 'tv', 94605);
+    expect(show).toMatchObject({ runtime: 40, seasons: 2, rating: null, year: 2021, tmdb_url: 'https://www.themoviedb.org/tv/94605' });
   });
 });

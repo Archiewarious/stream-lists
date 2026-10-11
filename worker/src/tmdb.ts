@@ -44,6 +44,54 @@ export const toTmdbResults = (data: { results?: TmdbRawResult[] }): TmdbResult[]
     .filter((result) => result.title)
     .slice(0, MAX_RESULTS);
 
+/** What the viewer's details card shows. */
+export interface MovieDetails {
+  title: string;
+  year: number | null;
+  tagline: string | null;
+  overview: string | null;
+  genres: string[];
+  /** Minutes (an episode for a show). */
+  runtime: number | null;
+  seasons: number | null;
+  /** TMDB users' average, 0–10. */
+  rating: number | null;
+  votes: number;
+  poster_path: string | null;
+  tmdb_url: string;
+}
+
+interface TmdbRawDetails {
+  id?: number;
+  title?: string;
+  name?: string;
+  tagline?: string;
+  overview?: string;
+  genres?: { name?: string }[];
+  runtime?: number;
+  episode_run_time?: number[];
+  number_of_seasons?: number;
+  vote_average?: number;
+  vote_count?: number;
+  release_date?: string;
+  first_air_date?: string;
+  poster_path?: string | null;
+}
+
+export const toMovieDetails = (data: TmdbRawDetails, type: 'movie' | 'tv', id: number): MovieDetails => ({
+  title: (data.title ?? data.name ?? '').trim(),
+  year: Number.parseInt((data.release_date ?? data.first_air_date ?? '').slice(0, 4)) || null,
+  tagline: data.tagline?.trim() || null,
+  overview: data.overview?.trim() || null,
+  genres: (data.genres ?? []).map((genre) => genre.name ?? '').filter(Boolean),
+  runtime: (type === 'movie' ? data.runtime : data.episode_run_time?.[0]) || null,
+  seasons: type === 'tv' ? data.number_of_seasons || null : null,
+  rating: data.vote_count ? Math.round((data.vote_average ?? 0) * 10) / 10 : null,
+  votes: data.vote_count ?? 0,
+  poster_path: data.poster_path && POSTER_PATH.test(data.poster_path) ? data.poster_path : null,
+  tmdb_url: `https://www.themoviedb.org/${type}/${id}`,
+});
+
 const normalize = (text: string) =>
   text
     .toLowerCase()

@@ -162,5 +162,14 @@
     "hide": "Скрыть",
     "edit": "Поправить",
     "empty": "Всё проверено"
+  },
+  "details": {
+    "minutes": "{{count}} мин",
+    "seasons": "{{count}} сез.",
+    "streamerRating": "Оценка стримера {{rating}}",
+    "failed": "Не удалось загрузить описание.",
+    "noOverview": "Описания нет.",
+    "openTmdb": "Открыть на TMDB",
+    "attribution": "Данные и постеры — TMDB. Сервис не является продуктом TMDB и не одобрен им."
   }
 }

@@ -1,12 +1,13 @@
 import { useTranslation } from 'react-i18next';
 
 import { formatDay, matchesTitle } from '@domains/lists/lib/items';
-import type { PanelList } from '@domains/lists/lib/panelLists';
+import type { PanelItem, PanelList } from '@domains/lists/lib/panelLists';
 import Poster from '@shared/ui/Poster';
 
 interface PanelSearchResultsProps {
   list: PanelList;
   query: string;
+  onOpen: (item: PanelItem) => void;
 }
 
 const Highlight = ({ text, query }: { text: string; query: string }) => {
@@ -23,7 +24,7 @@ const Highlight = ({ text, query }: { text: string; query: string }) => {
 };
 
 /** "А это уже смотрели?" — matches from the queue and the history with their status. */
-const PanelSearchResults = ({ list, query }: PanelSearchResultsProps) => {
+const PanelSearchResults = ({ list, query, onOpen }: PanelSearchResultsProps) => {
   const { t, i18n } = useTranslation();
   const trimmedQuery = query.trim();
 
@@ -46,7 +47,14 @@ const PanelSearchResults = ({ list, query }: PanelSearchResultsProps) => {
           : t(`columns.${list.kind}.notFound`)}
       </p>
       {results.map(({ item, chip }) => (
-        <div key={item.id} className="glass flex items-center gap-2.5 rounded-2xl p-2 text-[13px] font-bold">
+        <div
+          key={item.id}
+          role={item.tmdb_id ? 'button' : undefined}
+          tabIndex={item.tmdb_id ? 0 : undefined}
+          onClick={() => onOpen(item)}
+          onKeyDown={(event) => event.key === 'Enter' && onOpen(item)}
+          className={`glass flex items-center gap-2.5 rounded-2xl p-2 text-[13px] font-bold ${item.tmdb_id ? 'cursor-pointer' : ''}`}
+        >
           <Poster path={item.poster_path} width={34} />
           <div className="min-w-0 flex-1">
             <div className="truncate">

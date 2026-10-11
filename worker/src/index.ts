@@ -3,7 +3,7 @@ import { signJwt, verifyJwt } from './jwt';
 import { matchLots, normalizeTitle, planLotSync, toPointaucLots, type PointaucLot } from './pointauc';
 import { buildSnapshot, SNAPSHOT_VERSION, type ChannelList, type ItemRow, type ListRow } from './snapshot';
 import { parseTheme, type ChannelTheme } from './theme';
-import { pickMatch, POSTER_PATH, searchQueries, toTmdbResults, type TmdbResult } from './tmdb';
+import { pickMatch, POSTER_PATH, searchQueries, toMovieDetails, toTmdbResults, type TmdbResult } from './tmdb';
 
 interface Env {
   DB: D1Database;
@@ -177,20 +177,21 @@ const NEXT_QUEUE_POSITION = "(SELECT COALESCE(MAX(position), 0) + 1 FROM items W
 // --- TMDB (the key stays here; the browser only sees the results) ---
 
 /** Movies and shows; `language` like "ru-RU". Accepts a v3 API key or a v4 read access token (JWT, "eyJ…"). */
-const searchTmdb = async (query: string, language: string, apiKey: string) => {
-  const url = new URL('https://api.themoviedb.org/3/search/multi');
-  url.searchParams.set('query', query);
-  url.searchParams.set('language', language);
-  url.searchParams.set('include_adult', 'false');
+const tmdbRequest = async (path: string, params: Record<string, string>, apiKey: string) => {
+  const url = new URL(`https://api.themoviedb.org/3/${path}`);
+  for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
   const headers: Record<string, string> = {};
   if (apiKey.startsWith('eyJ')) headers.Authorization = `Bearer ${apiKey}`;
   else url.searchParams.set('api_key', apiKey);
 
-  // Same query → same answer for a day; saves TMDB requests while the streamer types.
+  // Same request → same answer for a day; saves TMDB requests (typing, many viewers opening one film).
   const response = await fetch(url, { headers, cf: { cacheTtl: 86400, cacheEverything: true } });
   if (!response.ok) throw new Error(`TMDB ${response.status}`);
-  return toTmdbResults(await response.json());
+  return response.json<any>(); // shaped by toTmdbResults / toMovieDetails, which drop everything unexpected
 };
+
+const searchTmdb = async (query: string, language: string, apiKey: string) =>
+  toTmdbResults(await tmdbRequest('search/multi', { query, language, include_adult: 'false' }, apiKey));
 
 type TmdbFields = Pick<ItemRow, 'tmdb_id' | 'year' | 'poster_path' | 'tmdb_type'>;
 
@@ -750,6 +751,21 @@ export default {
       // Viewers read the full lists of the channel they are watching (history and search beyond the snapshot).
       // ponytail: one D1 read per viewer request, no edge cache; add caches.default keyed by channel if traffic grows.
       if (route === 'GET /api/viewer/channel') return json({ lists: await loadChannel(env.DB, claims.channel_id) });
+
+      // The details card a viewer opens by clicking a title (TMDB id and type come from the snapshot).
+      if (route === 'GET /api/movie/:id') {
+        if (!env.TMDB_API_KEY) throw new HttpError(503, 'TMDB is not configured');
+        const params = new URL(request.url).searchParams;
+        const type = params.get('type') === 'tv' ? 'tv' : 'movie';
+        const language = params.get('lang') === 'ru' ? 'ru-RU' : 'en-US';
+        try {
+          const details = await tmdbRequest(`${type}/${id}`, { language }, env.TMDB_API_KEY);
+          return json(toMovieDetails(details, type, id));
+        } catch (error) {
+          console.error(error);
+          throw new HttpError(502, 'TMDB is unavailable');
+        }
+      }
       if (claims.role !== 'broadcaster') throw new HttpError(403, 'Only the broadcaster can edit lists');
 
       const data = await handleApi(request, env, claims.channel_id, route, id);
