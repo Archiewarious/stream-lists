@@ -17,9 +17,24 @@ export interface TwitchApi {
   mirrorSnapshot?: (content: string) => void;
 }
 
+// Twitch.ext.onAuthorized keeps only the LAST callback, so every listener of ours goes through one subscription
+// (a second `Twitch.ext.onAuthorized` call silently disconnects the first — the requests to the Worker never left).
+const authListeners = new Set<(auth: TwitchAuth) => void>();
+let lastAuth: TwitchAuth | undefined;
+let isAuthSubscribed = false;
+
 const realTwitchApi: TwitchApi = {
   workerUrl: 'https://stream-lists.begidan32.workers.dev',
-  onAuthorized: (callback) => Twitch.ext.onAuthorized(({ token, channelId }) => callback({ token, channelId })),
+  onAuthorized: (callback) => {
+    authListeners.add(callback);
+    if (lastAuth) callback(lastAuth);
+    if (isAuthSubscribed) return;
+    isAuthSubscribed = true;
+    Twitch.ext.onAuthorized(({ token, channelId }) => {
+      lastAuth = { token, channelId };
+      authListeners.forEach((listener) => listener(lastAuth!));
+    });
+  },
   getBroadcasterConfig: () => Twitch.ext.configuration.broadcaster?.content,
   onConfigChanged: (callback) => Twitch.ext.configuration.onChanged(callback),
   listenBroadcast: (callback) => {
