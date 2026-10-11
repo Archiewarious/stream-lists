@@ -37,6 +37,15 @@ describe('verifyJwt', () => {
     expect(await verifyJwt(`${hs384}.${hs384Signature}`, secret)).toBeNull();
     expect(await verifyJwt('', secret)).toBeNull();
   });
+
+  it('accepts a token signed with any of several secrets', async () => {
+    const [a, b, c] = ['secret-a', 'secret-b', 'secret-c'].map((value) => btoa(value));
+    const token = await signJwt(claims, b);
+    expect(await verifyJwt(token, [a, b])).toEqual(claims);
+    expect(await verifyJwt(token, [a])).toBeNull();
+    expect(await verifyJwt(await signJwt(claims, c), [a, b])).toBeNull();
+    expect(await verifyJwt(token, ['not base64!', b])).toEqual(claims);
+  });
 });
 
 describe('buildSnapshot', () => {
@@ -210,6 +219,46 @@ describe('planLotSync', () => {
   it('adds nothing without chosen ids', () => {
     expect(planLotSync(lots, items, null).toAdd).toEqual([]);
   });
+
+  it('follows a renamed item by its lot, and a known title under a new lot id', () => {
+    expect(planLotSync([{ id: 'L1', name: 'Dune', amount: 80 }], [{ id: 7, title: 'Дюна', points: 50, lot_id: 'L1' }], new Set(['L1']))).toEqual({
+      toAdd: [],
+      toUpdate: [{ id: 7, points: 80, lot_id: 'L1' }],
+    });
+    // The Pointauc tab was reloaded: same title, new id.
+    expect(planLotSync([{ id: 'L9', name: 'Дюна', amount: 50 }], [{ id: 7, title: 'Дюна', points: 50, lot_id: 'L1' }], null).toUpdate).toEqual([
+      { id: 7, points: 50, lot_id: 'L9' },
+    ]);
+  });
+
+  it('takes the biggest bid of lots with one title and keeps it, whatever their order', () => {
+    const twins = [
+      { id: 'A', name: 'Dune', amount: 40 },
+      { id: 'B', name: 'dune', amount: 100 },
+    ];
+    let item = { id: 1, title: 'Dune', points: 40, lot_id: 'A' };
+    expect(planLotSync(twins, [item], null).toUpdate).toEqual([{ id: 1, points: 100, lot_id: 'B' }]);
+    item = { ...item, points: 100, lot_id: 'B' };
+    expect(planLotSync(twins, [item], null).toUpdate).toEqual([]);
+    expect(planLotSync([...twins].reverse(), [item], null).toUpdate).toEqual([]);
+    // Equal bids: the item stays with its lot.
+    const tie = [{ id: 'A', name: 'Dune', amount: 5 }, { id: 'B', name: 'Dune', amount: 5 }];
+    expect(planLotSync(tie, [{ id: 1, title: 'Dune', points: 5, lot_id: 'B' }], null).toUpdate).toEqual([]);
+    // A new title twice: the lot with the biggest bid is added.
+    expect(planLotSync(twins, [], new Set(['A', 'B'])).toAdd).toEqual([{ id: 'B', name: 'dune', amount: 100 }]);
+  });
+
+  it('reads no lot without its own id', () => {
+    expect(toPointaucLots({ lots: [{ fastId: 3, name: 'Дюна', amount: 5 }] })).toEqual([]);
+  });
+
+  it('matches a lot to the queued copy of a title that was also watched', () => {
+    const items = [
+      { title: 'Dune', status: 'queue' as const, watched_at: null },
+      { title: 'Dune', status: 'watched' as const, watched_at: 100 },
+    ];
+    expect(matchLots([{ id: '1', name: 'Dune', amount: 5 }], items)).toEqual([{ id: '1', name: 'Dune', amount: 5, status: 'queue', position: 1 }]);
+  });
 });
 
 describe('toMovieDetails', () => {
@@ -227,11 +276,11 @@ describe('toMovieDetails', () => {
         poster_path: '/3hbXNclcHaj5KiF6kK41GBMjyFr.jpg',
       },
       'movie',
-      438631,
     );
-    expect(movie).toMatchObject({ title: 'Дюна', year: 2021, tagline: null, genres: ['фантастика', 'приключения'], runtime: 155, seasons: null, rating: 7.8, tmdb_url: 'https://www.themoviedb.org/movie/438631' });
+    expect(movie).toMatchObject({ title: 'Дюна', year: 2021, tagline: null, genres: ['фантастика', 'приключения'], runtime: 155, seasons: null, rating: 7.8 });
+    expect(movie).not.toHaveProperty('tmdb_url'); // no link out to TMDB (owner's decision)
 
-    const show = toMovieDetails({ name: 'Аркейн', episode_run_time: [40], number_of_seasons: 2, vote_count: 0, first_air_date: '2021-11-06' }, 'tv', 94605);
-    expect(show).toMatchObject({ runtime: 40, seasons: 2, rating: null, year: 2021, tmdb_url: 'https://www.themoviedb.org/tv/94605' });
+    const show = toMovieDetails({ name: 'Аркейн', episode_run_time: [40], number_of_seasons: 2, vote_count: 0, first_air_date: '2021-11-06' }, 'tv');
+    expect(show).toMatchObject({ runtime: 40, seasons: 2, rating: null, year: 2021 });
   });
 });

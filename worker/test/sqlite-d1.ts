@@ -1,7 +1,9 @@
 // The part of the D1 API the Worker uses, over Node's built-in SQLite (in memory). D1 is SQLite too; like D1 this
-// checks foreign keys and runs a batch as one transaction. Every call is async, so concurrent requests interleave
-// at the same points as on D1.
+// checks foreign keys and runs a batch as one transaction. Every call waits for the next turn of the event loop, like
+// a round trip to D1, so concurrent requests interleave at the same points as on D1.
 import { DatabaseSync, type SQLInputValue } from 'node:sqlite';
+
+const roundTrip = () => new Promise((resolve) => setImmediate(resolve));
 
 export const sqliteD1 = (): D1Database => {
   const db = new DatabaseSync(':memory:');
@@ -13,12 +15,17 @@ export const sqliteD1 = (): D1Database => {
     const self = {
       bind: (...values: SQLInputValue[]) => statement(sql, values),
       first: async (column?: string) => {
+        await roundTrip();
         const [row] = rows();
         if (!row) return null;
         return column === undefined ? row : row[column];
       },
-      all: async () => ({ success: true, results: rows(), meta: meta() }),
+      all: async () => {
+        await roundTrip();
+        return { success: true, results: rows(), meta: meta() };
+      },
       run: async () => {
+        await roundTrip();
         const result = db.prepare(sql).run(...params);
         return { success: true, results: [], meta: { changes: Number(result.changes), last_row_id: Number(result.lastInsertRowid) } };
       },
@@ -31,6 +38,7 @@ export const sqliteD1 = (): D1Database => {
   return {
     prepare: (sql: string) => statement(sql),
     batch: async (statements: ReturnType<typeof statement>[]) => {
+      await roundTrip();
       db.exec('BEGIN');
       try {
         const results = statements.map((item) => item.allNow());

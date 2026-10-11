@@ -8,6 +8,8 @@ import { pickMatch, POSTER_PATH, searchQueries, toMovieDetails, toTmdbResults, t
 interface Env {
   DB: D1Database;
   EXTENSION_SECRET: string;
+  /** The secret before a rotation, accepted until every viewer has a token signed with the new one. */
+  EXTENSION_SECRET_PREVIOUS?: string;
   CLIENT_ID: string;
   OWNER_ID: string;
   TMDB_API_KEY?: string;
@@ -141,8 +143,22 @@ const saveSetting = (
     .run();
 
 const getEncryptionKey = (env: Env) => {
-  if (!env.TOKEN_ENCRYPTION_KEY) throw new HttpError(503, 'TOKEN_ENCRYPTION_KEY is not configured');
-  return env.TOKEN_ENCRYPTION_KEY;
+  let size = 0;
+  try {
+    size = atob(env.TOKEN_ENCRYPTION_KEY ?? '').length;
+  } catch {} // not base64
+  if (size !== 32) throw new HttpError(503, 'TOKEN_ENCRYPTION_KEY must be base64 of 32 bytes');
+  return env.TOKEN_ENCRYPTION_KEY!;
+};
+
+/** The stored Pointauc token in clear; one saved under another key cannot be read and has to be entered again. */
+const readPointaucToken = async (env: Env, stored: string) => {
+  const key = getEncryptionKey(env);
+  try {
+    return await decryptText(stored, key);
+  } catch {
+    throw new HttpError(409, 'Pointauc token must be entered again');
+  }
 };
 
 // Pointauc relays the request to the streamer's open pointauc.com tab; with the tab closed (or a bad token)
@@ -153,7 +169,9 @@ const fetchPointaucLots = async (token: string) => {
   return toPointaucLots(await response.json());
 };
 
-const getOwnedList = async (db: D1Database, channelId: string, listId: number) => {
+/** `value` comes from a path, a JSON body or a query string: an integer or a string of digits, nothing else. */
+const getOwnedList = async (db: D1Database, channelId: string, value: unknown) => {
+  const listId = typeof value === 'string' && /^\d+$/.test(value) ? Number(value) : value;
   if (!Number.isInteger(listId)) throw new HttpError(400, 'list_id must be an integer');
   const list = await db
     .prepare('SELECT * FROM lists WHERE id = ? AND channel_id = ?')
@@ -175,7 +193,47 @@ const getOwnedItem = async (db: D1Database, channelId: string, itemId: number) =
 const countItems = async (db: D1Database, listId: number) =>
   (await db.prepare('SELECT COUNT(*) AS count FROM items WHERE list_id = ?').bind(listId).first<number>('count')) ?? 0;
 
-const NEXT_QUEUE_POSITION = "(SELECT COALESCE(MAX(position), 0) + 1 FROM items WHERE list_id = ? AND status = 'queue')";
+/** The place after the last queued item of a list; `listId` is the SQL parameter that holds the list id. */
+const nextQueuePosition = (listId: string) =>
+  `(SELECT COALESCE(MAX(position), 0) + 1 FROM items WHERE list_id = ${listId} AND status = 'queue')`;
+
+type NewItem = Pick<ItemRow, 'list_id' | 'title' | 'status'> &
+  Partial<Pick<ItemRow, 'year' | 'tmdb_id' | 'poster_path' | 'tmdb_type' | 'source' | 'points' | 'lot_id'>>;
+
+/**
+ * Inserts one item at the end of the queue; RETURNING gives the row, or nothing if it was skipped. Unless
+ * `allowSameTitle`, the item is skipped when the list already has its title or its Pointauc lot: the callers check
+ * that in JS first, and this repeats it inside the write, so two requests at once (a double click, two sync passes)
+ * cannot both add it. `checkLimit` keeps the list within MAX_ITEMS_PER_LIST the same way (batches count beforehand).
+ */
+const insertItem = (db: D1Database, item: NewItem, now: number, { allowSameTitle = false, checkLimit = false } = {}) => {
+  const conditions = [
+    ...(checkLimit ? [`(SELECT COUNT(*) FROM items WHERE list_id = ?1) < ${MAX_ITEMS_PER_LIST}`] : []),
+    ...(allowSameTitle
+      ? []
+      : ['NOT EXISTS (SELECT 1 FROM items WHERE list_id = ?1 AND title = ?2)', 'NOT EXISTS (SELECT 1 FROM items WHERE list_id = ?1 AND lot_id = ?12)']),
+  ];
+  return db
+    .prepare(
+      `INSERT INTO items (list_id, title, year, tmdb_id, poster_path, tmdb_type, status, position, added_at, watched_at, source, points, lot_id)
+       SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ${nextQueuePosition('?1')}, ?8, ?9, ?10, ?11, ?12
+       ${conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''} RETURNING *`,
+    )
+    .bind(
+      item.list_id,
+      item.title,
+      item.year ?? null,
+      item.tmdb_id ?? null,
+      item.poster_path ?? null,
+      item.tmdb_type ?? null,
+      item.status,
+      now,
+      item.status === 'watched' ? now : null,
+      item.source ?? 'manual',
+      item.points ?? null,
+      item.lot_id ?? null,
+    );
+};
 
 // --- TMDB (the key stays here; the browser only sees the results) ---
 
@@ -188,8 +246,14 @@ const tmdbRequest = async (path: string, params: Record<string, string>, apiKey:
   else url.searchParams.set('api_key', apiKey);
 
   // Same request → same answer for a day; saves TMDB requests (typing, many viewers opening one film).
-  const response = await fetch(url, { headers, cf: { cacheTtl: 86400, cacheEverything: true } });
-  if (!response.ok) throw new Error(`TMDB ${response.status}`);
+  // The URL may carry the key, so neither a redirect nor a fetch error (whose text may quote it) goes anywhere.
+  let response: Response;
+  try {
+    response = await fetch(url, { headers, redirect: 'manual', cf: { cacheTtl: 86400, cacheEverything: true } });
+  } catch {
+    throw new HttpError(502, 'TMDB request failed');
+  }
+  if (!response.ok) throw new HttpError(response.status === 404 ? 404 : 502, `TMDB ${response.status}`);
   return response.json<any>(); // shaped by toTmdbResults / toMovieDetails, which drop everything unexpected
 };
 
@@ -215,7 +279,7 @@ const matchTitles = async (env: Env, titles: string[], minVotes = 0): Promise<Ma
           found.set(title, { tmdb_id: match.tmdb_id, year: match.year, poster_path: match.poster_path, tmdb_type: match.type });
         }
       } catch (error) {
-        console.error('TMDB lookup failed', title, error);
+        console.error('TMDB lookup failed', error); // not the title: viewers write lot names
       }
     }),
   );
@@ -240,33 +304,18 @@ const syncLots = async (env: Env, list: ListRow, lots: PointaucLot[], addIds: Se
 
   const matched =
     list.kind === 'movies' ? await matchTitles(env, plan.toAdd.map((lot) => lot.name)) : new Map<string, TmdbFields>();
-  const basePosition = (await db.prepare(`SELECT ${NEXT_QUEUE_POSITION} AS next`).bind(list.id).first<number>('next')) ?? 1;
 
   const update = db.prepare('UPDATE items SET points = ?, lot_id = ? WHERE id = ?');
-  const insert = db.prepare(
-    `INSERT INTO items (list_id, title, year, tmdb_id, poster_path, tmdb_type, status, position, added_at, watched_at, source, points, lot_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pointauc', ?, ?) RETURNING *`,
-  );
   const updates = plan.toUpdate.map((change) => update.bind(change.points, change.lot_id, change.id));
-  const inserts = plan.toAdd.map((lot, index) => {
-    const movie = matched.get(lot.name);
-    return insert.bind(
-      list.id,
-      lot.name,
-      movie?.year ?? null,
-      movie?.tmdb_id ?? null,
-      movie?.poster_path ?? null,
-      movie?.tmdb_type ?? null,
-      status,
-      basePosition + index,
+  const inserts = plan.toAdd.map((lot) =>
+    insertItem(
+      db,
+      { ...matched.get(lot.name), list_id: list.id, title: lot.name, status, source: 'pointauc', points: lot.amount, lot_id: lot.id },
       now,
-      status === 'watched' ? now : null,
-      lot.amount,
-      lot.id,
-    );
-  });
+    ),
+  );
   const results = updates.length + inserts.length ? await db.batch<ItemRow>([...updates, ...inserts]) : [];
-  return { added: results.slice(updates.length).map((result) => result.results[0]), updated: updates.length };
+  return { added: results.slice(updates.length).flatMap((result) => result.results), updated: updates.length };
 };
 
 // --- Twitch snapshot ---
@@ -323,7 +372,7 @@ const autoSyncChannel = async (env: Env, channelId: string, listId: number, stor
   const db = env.DB;
   const list = await db.prepare('SELECT * FROM lists WHERE id = ? AND channel_id = ?').bind(listId, channelId).first<ListRow>();
   if (!list) return false;
-  const lots = await fetchPointaucLots(await decryptText(storedToken, getEncryptionKey(env)));
+  const lots = await fetchPointaucLots(await readPointaucToken(env, storedToken));
 
   const [items, pending] = await Promise.all([
     db
@@ -354,20 +403,18 @@ const autoSyncChannel = async (env: Env, channelId: string, listId: number, stor
   if (items.results.length + toQueue.length > MAX_ITEMS_PER_LIST) return false;
 
   const now = Date.now();
-  const basePosition = (await db.prepare(`SELECT ${NEXT_QUEUE_POSITION} AS next`).bind(list.id).first<number>('next')) ?? 1;
   const update = db.prepare('UPDATE items SET points = ?, lot_id = ? WHERE id = ?');
-  const insert = db.prepare(
-    `INSERT INTO items (list_id, title, year, tmdb_id, poster_path, tmdb_type, status, position, added_at, source, points, lot_id)
-     VALUES (?, ?, ?, ?, ?, ?, 'queue', ?, ?, 'pointauc', ?, ?)`,
-  );
   const park = db.prepare('INSERT OR IGNORE INTO pending_lots (list_id, lot_id, name, points, created_at) VALUES (?, ?, ?, ?, ?)');
 
   const statements = [
     ...plan.toUpdate.map((change) => update.bind(change.points, change.lot_id, change.id)),
-    ...toQueue.map((lot, index) => {
-      const movie = matched.get(lot.name)!;
-      return insert.bind(list.id, lot.name, movie.year, movie.tmdb_id, movie.poster_path, movie.tmdb_type, basePosition + index, now, lot.amount, lot.id);
-    }),
+    ...toQueue.map((lot) =>
+      insertItem(
+        db,
+        { ...matched.get(lot.name), list_id: list.id, title: lot.name, status: 'queue', source: 'pointauc', points: lot.amount, lot_id: lot.id },
+        now,
+      ),
+    ),
     ...toPending.map((lot) => park.bind(list.id, lot.id, lot.name, lot.amount, now)),
   ];
   if (!statements.length) return false;
@@ -389,7 +436,10 @@ const runAutoSync = async (env: Env) => {
     try {
       await autoSyncChannel(env, channel.channel_id, channel.pointauc_list_id, channel.pointauc_token);
     } catch (error) {
-      console.error('Auto sync failed', channel.channel_id, error);
+      // A closed Pointauc tab (502) or a token to enter again (409) is the usual state, not worth a log line a minute.
+      if (!(error instanceof HttpError && (error.status === 502 || error.status === 409))) {
+        console.error('Auto sync failed', channel.channel_id, error);
+      }
     }
   }
 };
@@ -403,21 +453,26 @@ const handleApi = async (request: Request, env: Env, channelId: string, route: s
   switch (route) {
     case 'GET /api/channel': {
       const settings = await loadSettings(db, channelId);
+      const lists = await loadChannel(db, channelId);
+      // Lots TMDB did not know — the streamer decides (the viewer snapshot never contains them). A lot that got into
+      // its list another way meanwhile (import, typed by hand) is not offered again.
+      const pending = await db
+        .prepare(
+          `SELECT p.id, p.list_id, p.lot_id, p.name, p.points FROM pending_lots p JOIN lists ON lists.id = p.list_id
+           WHERE lists.channel_id = ? AND p.status = 'pending' ORDER BY p.id`,
+        )
+        .bind(channelId)
+        .all<PendingLot & { lot_id: string }>();
+      const isInList = (lot: PendingLot & { lot_id: string }) =>
+        !!lists
+          .find((list) => list.id === lot.list_id)
+          ?.items.some((item) => item.lot_id === lot.lot_id || normalizeTitle(item.title) === normalizeTitle(lot.name));
       return {
-        lists: await loadChannel(db, channelId),
+        lists,
         theme: settings?.theme ? parseTheme(JSON.parse(settings.theme)) : null,
         pointauc: !!settings?.pointauc_token,
         pointauc_list_id: settings?.pointauc_list_id ?? null,
-        // Lots TMDB did not know — the streamer decides (the viewer snapshot never contains them).
-        pending: (
-          await db
-            .prepare(
-              `SELECT p.id, p.list_id, p.name, p.points FROM pending_lots p JOIN lists ON lists.id = p.list_id
-               WHERE lists.channel_id = ? AND p.status = 'pending' ORDER BY p.id`,
-            )
-            .bind(channelId)
-            .all<PendingLot>()
-        ).results,
+        pending: pending.results.filter((lot) => !isInList(lot)).map(({ lot_id, ...lot }) => lot),
       };
     }
 
@@ -443,10 +498,10 @@ const handleApi = async (request: Request, env: Env, channelId: string, route: s
       return { ok: true };
 
     case 'GET /api/pointauc/lots': {
-      const list = await getOwnedList(db, channelId, Number(new URL(request.url).searchParams.get('list_id')));
+      const list = await getOwnedList(db, channelId, new URL(request.url).searchParams.get('list_id'));
       const stored = (await loadSettings(db, channelId))?.pointauc_token;
       if (!stored) throw new HttpError(409, 'Pointauc is not connected');
-      const lots = await fetchPointaucLots(await decryptText(stored, getEncryptionKey(env)));
+      const lots = await fetchPointaucLots(await readPointaucToken(env, stored));
       const items = await db
         .prepare(`SELECT title, status, watched_at FROM items WHERE list_id = ? ORDER BY position, id`)
         .bind(list.id)
@@ -457,7 +512,7 @@ const handleApi = async (request: Request, env: Env, channelId: string, route: s
     case 'POST /api/pointauc/import': {
       // The lots are read from Pointauc here, not taken from the browser: only their ids come from the dialog.
       const body = await readBody(request);
-      const list = await getOwnedList(db, channelId, Number(body.list_id));
+      const list = await getOwnedList(db, channelId, body.list_id);
       const status = body.status === undefined ? 'queue' : readEnum<ItemRow['status']>(body.status, ITEM_STATUSES, 'status');
       const lotIds = body.lot_ids;
       if (!Array.isArray(lotIds) || lotIds.length > MAX_BULK_ITEMS || !lotIds.every((lotId) => typeof lotId === 'string')) {
@@ -465,7 +520,7 @@ const handleApi = async (request: Request, env: Env, channelId: string, route: s
       }
       const stored = (await loadSettings(db, channelId))?.pointauc_token;
       if (!stored) throw new HttpError(409, 'Pointauc is not connected');
-      const lots = await fetchPointaucLots(await decryptText(stored, getEncryptionKey(env)));
+      const lots = await fetchPointaucLots(await readPointaucToken(env, stored));
       const { added } = await syncLots(env, list, lots, new Set<string>(lotIds), status);
       return { added, skipped: lotIds.length - added.length };
     }
@@ -479,7 +534,7 @@ const handleApi = async (request: Request, env: Env, channelId: string, route: s
       }
       const stored = (await loadSettings(db, channelId))?.pointauc_token;
       if (!stored) throw new HttpError(409, 'Pointauc is not connected');
-      const list = await getOwnedList(db, channelId, Number(listId));
+      const list = await getOwnedList(db, channelId, listId);
       await saveSetting(db, channelId, 'pointauc_list_id', list.id);
       try {
         await autoSyncChannel(env, channelId, list.id, stored);
@@ -515,22 +570,23 @@ const handleApi = async (request: Request, env: Env, channelId: string, route: s
 
       const fields = readMovieFields(body);
       if (list.kind === 'movies' && !('tmdb_id' in body)) Object.assign(fields, (await matchTitles(env, [title])).get(title));
-      const { year = null, tmdb_id = null, poster_path = null, tmdb_type = null } = fields;
 
-      const done = db.prepare("UPDATE pending_lots SET status = 'dismissed' WHERE id = ?").bind(row.id);
-      const existing = await db.prepare('SELECT id, title FROM items WHERE list_id = ?').bind(list.id).all<{ id: number; title: string }>();
+      const existing = await db.prepare('SELECT title FROM items WHERE list_id = ?').bind(list.id).all<{ title: string }>();
       if (existing.results.some((item) => normalizeTitle(item.title) === normalizeTitle(title))) {
-        await done.run(); // the list has it already
+        await db.prepare("UPDATE pending_lots SET status = 'dismissed' WHERE id = ?").bind(row.id).run(); // the list has it already
         return { ok: true, added: false };
       }
-      const insert = db
+      if (existing.results.length >= MAX_ITEMS_PER_LIST) throw new HttpError(409, `At most ${MAX_ITEMS_PER_LIST} items`);
+      const item = { ...fields, list_id: list.id, title, status: 'queue', source: 'pointauc', points: row.points, lot_id: row.lot_id } as const;
+      // Closed once its item is in the list — not when the insert was skipped because the list filled up meanwhile.
+      const close = db
         .prepare(
-          `INSERT INTO items (list_id, title, year, tmdb_id, poster_path, tmdb_type, status, position, added_at, source, points, lot_id)
-           VALUES (?, ?, ?, ?, ?, ?, 'queue', ${NEXT_QUEUE_POSITION}, ?, 'pointauc', ?, ?) RETURNING *`,
+          `UPDATE pending_lots SET status = 'dismissed'
+           WHERE id = ? AND EXISTS (SELECT 1 FROM items WHERE list_id = ? AND (lot_id = ? OR title = ?))`,
         )
-        .bind(list.id, title, year, tmdb_id, poster_path, tmdb_type, list.id, now, row.points, row.lot_id);
-      const [inserted] = await db.batch<ItemRow>([insert, done]);
-      return { ok: true, added: true, item: inserted.results[0] };
+        .bind(row.id, list.id, row.lot_id, title);
+      const [inserted] = await db.batch<ItemRow>([insertItem(db, item, now, { checkLimit: true }), close]);
+      return inserted.results[0] ? { ok: true, added: true, item: inserted.results[0] } : { ok: true, added: false };
     }
 
     case 'DELETE /api/pending/:id': {
@@ -562,12 +618,16 @@ const handleApi = async (request: Request, env: Env, channelId: string, route: s
       const body = await readBody(request);
       const title = readTitle(body.title, MAX_LIST_TITLE_LENGTH);
       const kind = readEnum(body.kind, LIST_KINDS, 'kind');
-      const listCount = await db.prepare('SELECT COUNT(*) AS count FROM lists WHERE channel_id = ?').bind(channelId).first<number>('count');
-      if ((listCount ?? 0) >= MAX_LISTS) throw new HttpError(409, `At most ${MAX_LISTS} lists`);
-      return db
-        .prepare('INSERT INTO lists (channel_id, title, kind, created_at) VALUES (?, ?, ?, ?) RETURNING *')
+      // The cap is checked inside the insert, so two requests at once cannot both pass it.
+      const list = await db
+        .prepare(
+          `INSERT INTO lists (channel_id, title, kind, created_at) SELECT ?1, ?2, ?3, ?4
+           WHERE (SELECT COUNT(*) FROM lists WHERE channel_id = ?1) < ${MAX_LISTS} RETURNING *`,
+        )
         .bind(channelId, title, kind, now)
         .first<ListRow>();
+      if (!list) throw new HttpError(409, `At most ${MAX_LISTS} lists`);
+      return list;
     }
 
     case 'PATCH /api/lists/:id': {
@@ -580,7 +640,11 @@ const handleApi = async (request: Request, env: Env, channelId: string, route: s
 
     case 'DELETE /api/lists/:id':
       await getOwnedList(db, channelId, id);
-      await db.prepare('DELETE FROM lists WHERE id = ?').bind(id).run(); // items go with it (ON DELETE CASCADE)
+      await db.batch([
+        db.prepare('DELETE FROM lists WHERE id = ?').bind(id), // items go with it (ON DELETE CASCADE)
+        // The sync stops with its list — a list created later may get the same id.
+        db.prepare('UPDATE channels SET pointauc_list_id = NULL WHERE channel_id = ? AND pointauc_list_id = ?').bind(channelId, id),
+      ]);
       return { ok: true };
 
     case 'POST /api/lists/:id/match-missing': {
@@ -617,27 +681,23 @@ const handleApi = async (request: Request, env: Env, channelId: string, route: s
 
     case 'POST /api/items': {
       const body = await readBody(request);
-      const list = await getOwnedList(db, channelId, Number(body.list_id));
+      const list = await getOwnedList(db, channelId, body.list_id);
       const title = readTitle(body.title, MAX_ITEM_TITLE_LENGTH);
       const status = body.status === undefined ? 'queue' : readEnum<ItemRow['status']>(body.status, ITEM_STATUSES, 'status');
       const fields = readMovieFields(body);
+      const tooMany = new HttpError(409, `At most ${MAX_ITEMS_PER_LIST} items`);
+      if ((await countItems(db, list.id)) >= MAX_ITEMS_PER_LIST) throw tooMany; // before TMDB: no lookup for nothing
       // Typed without picking a suggestion: TMDB may still know it for sure.
       if (list.kind === 'movies' && !('tmdb_id' in body)) Object.assign(fields, (await matchTitles(env, [title])).get(title));
-      const { year = null, tmdb_id = null, poster_path = null, tmdb_type = null } = fields;
-      if ((await countItems(db, list.id)) >= MAX_ITEMS_PER_LIST) throw new HttpError(409, `At most ${MAX_ITEMS_PER_LIST} items`);
-      return db
-        .prepare(
-          `INSERT INTO items (list_id, title, year, tmdb_id, poster_path, tmdb_type, status, position, added_at, watched_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ${NEXT_QUEUE_POSITION}, ?, ?) RETURNING *`,
-        )
-        .bind(list.id, title, year, tmdb_id, poster_path, tmdb_type, status, list.id, now, status === 'watched' ? now : null)
-        .first<ItemRow>();
+      const item = await insertItem(db, { ...fields, list_id: list.id, title, status }, now, { allowSameTitle: true, checkLimit: true }).first<ItemRow>();
+      if (!item) throw tooMany;
+      return item;
     }
 
     case 'POST /api/items/bulk': {
       // "Списком": many titles at once. Titles already in the list (or repeated in the paste) are skipped.
       const body = await readBody(request);
-      const list = await getOwnedList(db, channelId, Number(body.list_id));
+      const list = await getOwnedList(db, channelId, body.list_id);
       const status = body.status === undefined ? 'queue' : readEnum<ItemRow['status']>(body.status, ITEM_STATUSES, 'status');
       const source = body.source === 'pointauc' ? 'pointauc' : 'manual';
       if (!Array.isArray(body.titles) || body.titles.length > MAX_BULK_ITEMS) {
@@ -656,71 +716,50 @@ const handleApi = async (request: Request, env: Env, channelId: string, route: s
       if (existing.results.length + titles.length > MAX_ITEMS_PER_LIST) throw new HttpError(409, `At most ${MAX_ITEMS_PER_LIST} items`);
       if (!titles.length) return { added: [], skipped: body.titles.length };
 
-      const basePosition = (await db.prepare(`SELECT ${NEXT_QUEUE_POSITION} AS next`).bind(list.id).first<number>('next')) ?? 1;
       const matched = list.kind === 'movies' ? await matchTitles(env, titles) : new Map<string, TmdbFields>();
-      const insert = db.prepare(
-        `INSERT INTO items (list_id, title, year, tmdb_id, poster_path, tmdb_type, status, position, added_at, watched_at, source)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`,
-      );
       const results = await db.batch<ItemRow>(
-        titles.map((title, index) => {
-          const movie = matched.get(title);
-          return insert.bind(
-            list.id,
-            title,
-            movie?.year ?? null,
-            movie?.tmdb_id ?? null,
-            movie?.poster_path ?? null,
-            movie?.tmdb_type ?? null,
-            status,
-            basePosition + index,
-            now,
-            status === 'watched' ? now : null,
-            source,
-          );
-        }),
+        titles.map((title) => insertItem(db, { ...matched.get(title), list_id: list.id, title, status, source }, now)),
       );
-      return { added: results.map((result) => result.results[0]), skipped: body.titles.length - titles.length };
+      const added = results.flatMap((result) => result.results);
+      return { added, skipped: body.titles.length - added.length };
     }
 
     case 'PATCH /api/items/:id': {
       const item = await getOwnedItem(db, channelId, id);
       const body = await readBody(request);
-      const next: ItemRow = { ...item, ...readMovieFields(body) };
-      if ('title' in body) next.title = readTitle(body.title, MAX_ITEM_TITLE_LENGTH);
-      if ('status' in body) next.status = readEnum(body.status, ITEM_STATUSES, 'status');
-      if ('rating' in body) next.rating = readOptionalInt(body.rating, 'rating', 1, 10);
-      if (next.status !== 'watched') next.rating = null; // only watched items are rated; a requeued one starts over
+      // Only what the body names is written: the rest stays as it is in the row now, even if another request changed
+      // it meanwhile (a title lookup in TMDB takes a while).
+      const fields: Partial<Pick<ItemRow, 'title' | 'year' | 'tmdb_id' | 'poster_path' | 'tmdb_type'>> = readMovieFields(body);
+      if ('title' in body) fields.title = readTitle(body.title, MAX_ITEM_TITLE_LENGTH);
+      const status = 'status' in body ? readEnum<ItemRow['status']>(body.status, ITEM_STATUSES, 'status') : undefined;
+      const rating = 'rating' in body ? readOptionalInt(body.rating, 'rating', 1, 10) : undefined;
 
       // The title was corrected and no poster was picked by hand: look it up again (clears a wrong poster too).
-      if (next.title !== item.title && !('tmdb_id' in body) && !('poster_path' in body)) {
+      if (fields.title !== undefined && fields.title !== item.title && !('tmdb_id' in body) && !('poster_path' in body)) {
         const list = await getOwnedList(db, channelId, item.list_id);
-        const movie = list.kind === 'movies' ? (await matchTitles(env, [next.title])).get(next.title) : undefined;
-        Object.assign(next, { tmdb_id: null, year: null, poster_path: null, tmdb_type: null }, movie);
+        const movie = list.kind === 'movies' ? (await matchTitles(env, [fields.title])).get(fields.title) : undefined;
+        Object.assign(fields, { tmdb_id: null, year: null, poster_path: null, tmdb_type: null }, movie);
       }
 
-      // "Просмотрено" stamps the date; "Вернуть в очередь" clears it and puts the item last in line.
-      const isStatusChanged = next.status !== item.status;
-      next.watched_at = next.status === 'watched' ? (isStatusChanged ? now : item.watched_at) : null;
-      const isRequeued = isStatusChanged && next.status === 'queue';
-
+      const values: unknown[] = [status ?? null, now, item.list_id, rating ?? null]; // ?1–?4
+      const sets = Object.entries(fields).map(([column, value]) => `${column} = ?${values.push(value)}`);
+      // SET reads the row as it was, so `status` below is the old one.
+      if (status) {
+        // "Просмотрено" stamps the date; "Вернуть в очередь" clears it and puts the item last in line.
+        sets.push(
+          `watched_at = CASE WHEN ?1 = 'queue' THEN NULL WHEN status = 'watched' THEN watched_at ELSE ?2 END`,
+          `position = CASE WHEN ?1 = 'queue' AND status <> 'queue' THEN ${nextQueuePosition('?3')} ELSE position END`,
+        );
+      }
+      if (status || rating !== undefined) {
+        // Only watched items are rated; a requeued one starts over.
+        sets.push(`rating = CASE WHEN ${status ? '?1' : 'status'} = 'watched' THEN ${rating !== undefined ? '?4' : 'rating'} ELSE NULL END`);
+      }
+      if (status) sets.push('status = ?1');
+      if (!sets.length) return item;
       return db
-        .prepare(
-          `UPDATE items SET title = ?, year = ?, tmdb_id = ?, poster_path = ?, tmdb_type = ?, rating = ?, status = ?, watched_at = ?,
-           position = ${isRequeued ? NEXT_QUEUE_POSITION : '?'} WHERE id = ? RETURNING *`,
-        )
-        .bind(
-          next.title,
-          next.year,
-          next.tmdb_id,
-          next.poster_path,
-          next.tmdb_type,
-          next.rating,
-          next.status,
-          next.watched_at,
-          isRequeued ? item.list_id : item.position,
-          id,
-        )
+        .prepare(`UPDATE items SET ${sets.join(', ')} WHERE id = ?${values.push(id)} RETURNING *`)
+        .bind(...values)
         .first<ItemRow>();
     }
 
@@ -731,7 +770,8 @@ const handleApi = async (request: Request, env: Env, channelId: string, route: s
         statements.unshift(
           db
             .prepare(
-              "INSERT OR IGNORE INTO pending_lots (list_id, lot_id, name, points, status, created_at) VALUES (?, ?, ?, ?, 'dismissed', ?)",
+              `INSERT INTO pending_lots (list_id, lot_id, name, points, status, created_at) VALUES (?, ?, ?, ?, 'dismissed', ?)
+               ON CONFLICT (list_id, lot_id) DO UPDATE SET status = 'dismissed'`,
             )
             .bind(item.list_id, item.lot_id, item.title, item.points, now),
         );
@@ -754,27 +794,40 @@ export default {
 
     try {
       const token = request.headers.get('Authorization')?.replace(/^Bearer /, '') ?? '';
-      const claims = await verifyJwt(token, env.EXTENSION_SECRET);
+      const secrets = [env.EXTENSION_SECRET, env.EXTENSION_SECRET_PREVIOUS].filter((secret): secret is string => !!secret);
+      const claims = await verifyJwt(token, secrets);
       if (!claims) throw new HttpError(401, 'Invalid Twitch token');
 
       const { pathname } = new URL(request.url);
       const route = `${request.method} ${pathname.replace(/\/\d+(?=\/|$)/, '/:id')}`;
       const id = Number(pathname.match(/\/(\d+)(?=\/|$)/)?.[1]);
 
-      // Viewers read the full lists of the channel they are watching (history and search beyond the snapshot).
+      // Viewers read the full lists of the channel they are watching (history and search beyond the snapshot) —
+      // without what only the sync needs (Pointauc lot ids) and the add dates the panel never shows.
       // ponytail: one D1 read per viewer request, no edge cache; add caches.default keyed by channel if traffic grows.
-      if (route === 'GET /api/viewer/channel') return json({ lists: await loadChannel(env.DB, claims.channel_id) });
+      if (route === 'GET /api/viewer/channel') {
+        const lists = await loadChannel(env.DB, claims.channel_id);
+        return json({ lists: lists.map((list) => ({ ...list, items: list.items.map(({ lot_id, added_at, ...item }) => item) })) });
+      }
 
-      // The details card a viewer opens by clicking a title (TMDB id and type come from the snapshot).
+      // The details card a viewer opens by clicking a title (TMDB id and type come from the snapshot). Only titles of
+      // this channel: the TMDB key is shared, so it is not a lookup service for any id.
       if (route === 'GET /api/movie/:id') {
         if (!env.TMDB_API_KEY) throw new HttpError(503, 'TMDB is not configured');
         const params = new URL(request.url).searchParams;
         const type = params.get('type') === 'tv' ? 'tv' : 'movie';
         const language = params.get('lang') === 'ru' ? 'ru-RU' : 'en-US';
+        const isListed = await env.DB.prepare(
+          `SELECT 1 FROM items JOIN lists ON lists.id = items.list_id
+           WHERE lists.channel_id = ? AND items.tmdb_id = ? AND COALESCE(items.tmdb_type, 'movie') = ? LIMIT 1`,
+        )
+          .bind(claims.channel_id, id, type)
+          .first();
+        if (!isListed) throw new HttpError(404, 'Movie not found');
         try {
-          const details = await tmdbRequest(`${type}/${id}`, { language }, env.TMDB_API_KEY);
-          return json(toMovieDetails(details, type, id));
+          return json(toMovieDetails(await tmdbRequest(`${type}/${id}`, { language }, env.TMDB_API_KEY), type));
         } catch (error) {
+          if (error instanceof HttpError && error.status === 404) throw new HttpError(404, 'Movie not found');
           console.error(error);
           throw new HttpError(502, 'TMDB is unavailable');
         }

@@ -21,7 +21,13 @@ export const CLIENT_ID = 'test-client';
 const MIGRATIONS = new URL('../migrations/', import.meta.url);
 
 export type Lot = { id: string; name: string; amount: number };
-export type Outbound = { kind: 'twitch-config' | 'twitch-pubsub' | 'pointauc' | 'tmdb'; url: string; body?: any; auth?: string };
+export type Outbound = {
+  kind: 'twitch-config' | 'twitch-pubsub' | 'pointauc' | 'tmdb';
+  url: string;
+  body?: any;
+  auth?: string;
+  redirect?: RequestRedirect;
+};
 export type TmdbHandler = (url: URL) => Response | Promise<Response>;
 
 /** TMDB by default knows every title for sure: one movie named exactly like the query, 500 votes. */
@@ -66,7 +72,7 @@ export const startWorker = async () => {
       return lots ? Response.json({ lots: lots.map((lot) => ({ ...lot, investors: [] })) }) : new Response('nope', { status: 500 });
     }
     if (url.hostname === 'api.themoviedb.org') {
-      outbound.push({ kind: 'tmdb', url: url.href });
+      outbound.push({ kind: 'tmdb', url: url.href, redirect: init?.redirect });
       return fake.tmdb(url);
     }
     throw new Error(`Unexpected outbound fetch: ${url.href}`);

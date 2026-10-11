@@ -20,21 +20,28 @@ const textToBase64Url = (text: string) => bytesToBase64Url(encoder.encode(text))
 const importKey = (secret: string) =>
   crypto.subtle.importKey('raw', base64ToBytes(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign', 'verify']);
 
-/** Returns the payload of a valid, unexpired token, otherwise null. */
-export const verifyJwt = async (token: string, secret: string, now = Date.now()): Promise<TwitchJwtPayload | null> => {
+/**
+ * Returns the payload of a valid, unexpired token, otherwise null. Several secrets: any of them may have signed it
+ * (the previous one keeps working while a rotated secret reaches every viewer).
+ */
+export const verifyJwt = async (token: string, secrets: string | string[], now = Date.now()): Promise<TwitchJwtPayload | null> => {
   const [header, payload, signature, ...rest] = token.split('.');
   if (!header || !payload || !signature || rest.length) return null;
 
   try {
     if (JSON.parse(base64UrlToText(header)).alg !== 'HS256') return null;
 
-    const isSigned = await crypto.subtle.verify(
-      'HMAC',
-      await importKey(secret),
-      base64UrlToBytes(signature),
-      encoder.encode(`${header}.${payload}`),
+    const data = encoder.encode(`${header}.${payload}`);
+    const signedWith = await Promise.all(
+      [secrets].flat().map(async (secret) => {
+        try {
+          return await crypto.subtle.verify('HMAC', await importKey(secret), base64UrlToBytes(signature), data);
+        } catch {
+          return false; // a malformed secret signs nothing, but must not lock everyone out
+        }
+      }),
     );
-    if (!isSigned) return null;
+    if (!signedWith.includes(true)) return null;
 
     const claims = JSON.parse(base64UrlToText(payload));
     if (typeof claims.exp !== 'number' || claims.exp * 1000 <= now) return null;

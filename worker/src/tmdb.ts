@@ -58,7 +58,6 @@ export interface MovieDetails {
   rating: number | null;
   votes: number;
   poster_path: string | null;
-  tmdb_url: string;
 }
 
 interface TmdbRawDetails {
@@ -78,7 +77,7 @@ interface TmdbRawDetails {
   poster_path?: string | null;
 }
 
-export const toMovieDetails = (data: TmdbRawDetails, type: 'movie' | 'tv', id: number): MovieDetails => ({
+export const toMovieDetails = (data: TmdbRawDetails, type: 'movie' | 'tv'): MovieDetails => ({
   title: (data.title ?? data.name ?? '').trim(),
   year: Number.parseInt((data.release_date ?? data.first_air_date ?? '').slice(0, 4)) || null,
   tagline: data.tagline?.trim() || null,
@@ -89,7 +88,6 @@ export const toMovieDetails = (data: TmdbRawDetails, type: 'movie' | 'tv', id: n
   rating: data.vote_count ? Math.round((data.vote_average ?? 0) * 10) / 10 : null,
   votes: data.vote_count ?? 0,
   poster_path: data.poster_path && POSTER_PATH.test(data.poster_path) ? data.poster_path : null,
-  tmdb_url: `https://www.themoviedb.org/${type}/${id}`,
 });
 
 const normalize = (text: string) =>
