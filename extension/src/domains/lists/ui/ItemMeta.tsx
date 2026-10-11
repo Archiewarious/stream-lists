@@ -5,10 +5,10 @@ import { useTranslation } from 'react-i18next';
 
 const RATINGS = Array.from({ length: 10 }, (_, index) => index + 1);
 
-/** Pointauc bid on the title. Nothing for 0 / unknown. */
+/** Pointauc bid on the title; 0 for a lot nobody bid on, nothing for a title that is not from an auction. */
 export const Points = ({ value }: { value: number | null }) => {
   const { i18n } = useTranslation();
-  if (!value) return null;
+  if (value === null) return null;
 
   return (
     <span className="inline-flex shrink-0 items-center gap-px text-xs font-extrabold text-[var(--primary-hi)] tabular-nums">

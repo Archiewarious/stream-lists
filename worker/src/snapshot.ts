@@ -53,7 +53,7 @@ const compactItem = (item: ItemRow) => ({
   y: item.year ?? undefined,
   p: item.poster_path ?? undefined,
   d: item.watched_at ?? undefined,
-  b: item.points || undefined, // bid
+  b: item.points ?? undefined, // bid (0 = a lot without bids)
   r: item.rating ?? undefined,
   m: item.tmdb_id ?? undefined, // TMDB id, for the details card
   k: item.tmdb_type === 'tv' ? 1 : undefined,
