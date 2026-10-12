@@ -5,6 +5,8 @@ export const MAX_ITEMS_PER_LIST = 2000;
 export const MAX_BULK_ITEMS = 200;
 export const MAX_LIST_TITLE_LENGTH = 40;
 export const MAX_ITEM_TITLE_LENGTH = 200;
+// A search text (TMDB suggestions, the viewer's search in a list).
+export const MAX_QUERY_LENGTH = 100;
 // The same lists are CHECK constraints in migrations/ (a test compares them).
 export const LIST_KINDS = ['movies', 'games', 'custom'];
 export const ITEM_STATUSES = ['queue', 'watched'];

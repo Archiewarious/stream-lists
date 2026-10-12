@@ -255,7 +255,11 @@ export const autoSyncChannel = async (env: Env, channelId: string, listId: numbe
 export const runAutoSync = async (env: Env) => {
   const budget: Budget = { left: SUBREQUEST_LIMIT };
   const now = Date.now();
-  const stale = await env.DB.prepare(`SELECT channel_id FROM channels WHERE snapshot_stale = 1 LIMIT ${CRON_CHANNELS}`).all<{ channel_id: string }>();
+  // The longest without an attempt first (every attempt moves snapshot_at), so channels Twitch keeps refusing take
+  // turns with the others instead of holding the slots.
+  const stale = await env.DB
+    .prepare(`SELECT channel_id FROM channels WHERE snapshot_stale = 1 ORDER BY snapshot_at LIMIT ${CRON_CHANNELS}`)
+    .all<{ channel_id: string }>();
   for (const { channel_id } of stale.results) {
     budget.left -= 2;
     await publishSnapshot(env, channel_id);

@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { signJwt, verifyJwt } from './jwt';
 import { buildSnapshot, getByteSize, SNAPSHOT_LIMIT_BYTES, type ChannelList, type ItemRow } from './snapshot';
 import { decryptText, encryptText } from './crypto';
-import { matchLots, normalizeTitle, planLotSync, toPointaucLots } from './pointauc';
+import { clipTitle, matchLots, normalizeTitle, planLotSync, toPointaucLots } from './pointauc';
 import { parseTheme } from './theme';
 import { pickMatch, searchQueries, toMovieDetails, toTmdbResults, type TmdbResult } from './tmdb';
 
@@ -151,9 +151,9 @@ describe('Pointauc', () => {
     expect(toPointaucLots([{ id: 'x', name: 'old array shape' }])).toEqual([]);
   });
 
-  it('cuts a long lot name at 200 characters, not in the middle of an emoji', () => {
+  it('cuts a long lot name at 200 UTF-16 units, not in the middle of an emoji', () => {
     const [lot] = toPointaucLots({ lots: [{ id: 'a', name: `${'a'.repeat(199)}😀😀`, amount: 1 }] });
-    expect(lot.name).toBe(`${'a'.repeat(199)}😀`);
+    expect(lot.name).toBe('a'.repeat(199)); // the emoji takes two units: 201 would not pass the Worker's title check
   });
 
   it('encrypts the token so only the key opens it', async () => {
@@ -210,6 +210,17 @@ describe('pickMatch', () => {
     expect(searchQueries('Интерстеллар 2014')).toEqual(['Интерстеллар 2014', 'Интерстеллар']);
     expect(searchQueries('Дюна (1984)')).toEqual(['Дюна']);
     expect(searchQueries('Матрица')).toEqual(['Матрица']);
+  });
+});
+
+describe('clipTitle', () => {
+  it('counts UTF-16 units like the length checks do and does not cut an emoji in half', () => {
+    const emoji = '😀'.repeat(150); // 300 units
+    const clipped = clipTitle(emoji, 200);
+    expect(clipped.length).toBeLessThanOrEqual(200);
+    expect(clipped).toBe('😀'.repeat(100));
+    expect(clipTitle('a' + emoji, 200)).toBe('a' + '😀'.repeat(99)); // the 100th emoji would not fit
+    expect(clipTitle('Матрица', 200)).toBe('Матрица');
   });
 });
 

@@ -52,7 +52,8 @@ export const useChannel = () => {
   // A color being picked and not saved yet: a reload meanwhile must not repaint the window with the old one.
   const unsavedTheme = useRef<ChannelTheme | null>(null);
 
-  const reload = useCallback(async () => {
+  // `afterEdit`: the load follows the window's own edit, so a failure also says the edit may not be saved.
+  const load = useCallback(async (afterEdit: boolean) => {
     const seq = ++reloadSeq.current;
     try {
       const channel = await callWorker<{
@@ -80,9 +81,10 @@ export const useChannel = () => {
       const message = (error as Error).message;
       setLoadError(message);
       // The lists on screen may hold an edit the server never confirmed: say so where save errors show.
-      if (loaded.current) setSaveError((current) => current ?? message);
+      if (afterEdit && loaded.current) setSaveError((current) => current ?? message);
     }
   }, []);
+  const reload = useCallback(() => load(false), [load]);
 
   // Every snapshot the Worker broadcasts (cron sync, another window) reloads the lists, unless it shows what they have.
   useEffect(
@@ -112,7 +114,7 @@ export const useChannel = () => {
     } finally {
       pending.current -= 1;
       if (!pending.current) {
-        await reload(); // also rolls back an optimistic edit that failed
+        await load(true); // also rolls back an optimistic edit that failed
         if (!pending.current) setIsSaving(false);
       }
     }

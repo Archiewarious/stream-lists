@@ -89,7 +89,6 @@ export const startWorker = async () => {
     signJwt({ exp: Math.floor(Date.now() / 1000) + 3600, channel_id: channel, role, user_id: 'u1', ...extra }, SECRET);
 
   type CallOptions = { channel?: string; role?: string; body?: unknown; auth?: string | null };
-  /** One request through the Worker; waits for its waitUntil work (the snapshot publish) before returning. */
   /**
    * Virtual time: every request and cron run starts a minute after the previous one, so the Worker's own pacing
    * (sync passes, snapshot publishes) never holds a test up. A test that needs requests close together sets
@@ -102,6 +101,7 @@ export const startWorker = async () => {
     if (clock.auto) clock.now += 60_000;
   };
 
+  /** One request through the Worker; waits for its waitUntil work (the snapshot publish) before returning. */
   const call = async (method: string, path: string, { channel = 'c1', role = 'broadcaster', body, auth }: CallOptions = {}) => {
     tick();
     const start = outbound.length;

@@ -16,7 +16,9 @@ describe('parseBulkTitles', () => {
 
   it('drops control characters and does not cut an emoji in half', () => {
     expect(parseBulkTitles('\u0007\nМат\u0007рица')).toEqual(['Матрица']);
-    expect(parseBulkTitles(`${'a'.repeat(199)}😀😀`)).toEqual([`${'a'.repeat(199)}😀`]);
+    // 200 UTF-16 units, as the Worker counts: an emoji is two, so the 201st unit does not make it in half
+    expect(parseBulkTitles(`${'a'.repeat(199)}😀😀`)).toEqual(['a'.repeat(199)]);
+    expect(parseBulkTitles('😀'.repeat(150))).toEqual(['😀'.repeat(100)]);
   });
 });
 

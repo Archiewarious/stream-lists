@@ -4,6 +4,8 @@ import { IconPlus, IconSearch } from '@tabler/icons-react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { MAX_QUERY_LENGTH } from '@worker/config';
+import { clipTitle } from '@worker/pointauc';
 import type { TmdbResult } from '@worker/tmdb';
 import type { MovieFields } from '@domains/lists/model/useChannel';
 import { callWorker } from '@shared/api/workerApi';
@@ -52,7 +54,8 @@ const MovieSearchInput = ({
   useEffect(() => {
     if (!withSuggestions || debouncedValue.length < MIN_QUERY_LENGTH) return;
     let isCancelled = false;
-    const params = new URLSearchParams({ q: debouncedValue, lang: i18n.language });
+    // A title may be longer than TMDB's search text the Worker accepts: it looks up the beginning.
+    const params = new URLSearchParams({ q: clipTitle(debouncedValue, MAX_QUERY_LENGTH), lang: i18n.language });
     callWorker<TmdbResult[]>('GET', `/api/tmdb/search?${params}`)
       .then((nextResults) => !isCancelled && setFound({ query: debouncedValue, results: nextResults }))
       .catch(() => {}); // no key or TMDB down: adding still works without posters

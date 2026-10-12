@@ -78,6 +78,23 @@ describe('cron', () => {
   });
 });
 
+describe('stale snapshots', () => {
+  it('a channel Twitch keeps refusing does not hold the retries of the others', async () => {
+    await w.db.prepare('UPDATE channels SET pointauc_list_id = NULL').run(); // only the retries run
+    const channels = Array.from({ length: 6 }, (_, i) => `refused-${i}`);
+    w.fake.twitchStatus = 500;
+    for (const channel of channels) {
+      const { list } = await w.seedList(channel, 'custom');
+      await w.call('POST', '/api/items', { channel, body: { list_id: list.id, title: 'Lost' } });
+    }
+    const tried = new Set<string>();
+    for (let run = 0; run < 2; run++) {
+      for (const call of await w.scheduled()) if (call.kind === 'twitch-config') tried.add(call.body.broadcaster_id);
+    }
+    expect([...tried].sort()).toEqual(channels);
+  });
+});
+
 describe('sync pacing', () => {
   it('one pass per 10 seconds per channel, however many panels ask', async () => {
     await syncedChannel('pace', [{ id: 'L1', name: 'Heat', amount: 1 }]);

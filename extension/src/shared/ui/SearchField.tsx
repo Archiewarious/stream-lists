@@ -3,6 +3,8 @@ import { IconSearch } from '@tabler/icons-react';
 import { useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { MAX_QUERY_LENGTH } from '@worker/config';
+
 type Props = { value: string; onChange: (value: string) => void; label: string; className: string };
 
 /** A panel's search field: the label is its placeholder too; the cross clears it and keeps the focus in it. */
@@ -13,6 +15,7 @@ export default function SearchField({ value, onChange, label, className }: Props
     <TextInput
       ref={ref}
       className={className}
+      maxLength={MAX_QUERY_LENGTH} // the Worker answers 400 to a longer search
       size="xs"
       leftSection={<IconSearch size={14} />}
       rightSectionPointerEvents="all"

@@ -27,8 +27,16 @@ export const knownLots = (ids: (string | null)[], titles: string[]) => {
   return (id: string, title: string) => idSet.has(id) || titleSet.has(normalizeTitle(title));
 };
 
-/** The first `max` characters of a title, without cutting a character that takes two UTF-16 units (emoji) in half. */
-export const clipTitle = (title: string, max: number) => (title.length <= max ? title : Array.from(title).slice(0, max).join(''));
+/** The title cut to `max` UTF-16 units (what the Worker's length checks count), never in the middle of an emoji. */
+export const clipTitle = (title: string, max: number) => {
+  if (title.length <= max) return title;
+  let clipped = '';
+  for (const char of title) {
+    if (clipped.length + char.length > max) break;
+    clipped += char;
+  }
+  return clipped;
+};
 
 /**
  * GET /api/oshino/lots answers { lots: [{ fastId, id, name, amount, investors }] }; anything malformed is skipped.

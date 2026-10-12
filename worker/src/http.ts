@@ -1,6 +1,6 @@
 // HTTP plumbing and the checks every request body goes through.
 
-import { ITEM_STATUSES, TMDB_TYPES } from './config';
+import { ITEM_STATUSES, MAX_QUERY_LENGTH, TMDB_TYPES } from './config';
 import type { ItemRow } from './snapshot';
 import { POSTER_PATH } from './tmdb';
 
@@ -39,14 +39,14 @@ export const readTitle = (value: unknown, maxLength: number) => {
 /** The search text in `?q=`. */
 export const readQuery = (params: URLSearchParams) => {
   const query = params.get('q')?.trim() ?? '';
-  if (!query || query.length > 100) throw new HttpError(400, 'q must be 1–100 characters');
+  if (!query || query.length > MAX_QUERY_LENGTH) throw new HttpError(400, `q must be 1–${MAX_QUERY_LENGTH} characters`);
   return query;
 };
 
 /** TMDB's language for the panel's `?lang=`. */
 export const tmdbLanguage = (params: URLSearchParams) => (params.get('lang') === 'ru' ? 'ru-RU' : 'en-US');
 
-export const readEnum =<T extends string>(value: unknown, allowed: string[], field: string) => {
+export const readEnum = <T extends string>(value: unknown, allowed: string[], field: string) => {
   if (!allowed.includes(value as string)) throw new HttpError(400, `${field} must be one of: ${allowed.join(', ')}`);
   return value as T;
 };

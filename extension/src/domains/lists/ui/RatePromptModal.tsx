@@ -39,6 +39,7 @@ const RatePromptModal = ({ item, onRate, onClose, isFullScreen }: RatePromptModa
                 key={value}
                 variant="default"
                 size="md"
+                px={0} // five to a row in a 360 px window: with the default padding "10" does not fit
                 onClick={() => {
                   onRate(item.id, value);
                   onClose();
